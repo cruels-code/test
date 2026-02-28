@@ -1,3 +1,17 @@
+// ==========================================================
+// MOCK EDITART ENVIRONMENT (For Local Testing) 
+// In production, the platform injects its own parameters here.
+// ==========================================================
+if (typeof window.m0 === 'undefined') {
+    console.log("Mocking EditArt parameters for local testing...");
+    window.m0 = 0.5; // Color Palette Seed (0.0 to 1.0)
+    window.m1 = 0.5; // Effect Speed / Turbulence (0.0 to 1.0)
+    window.m2 = 0.5; // Zone Split Depth (Complexity) (0.0 to 1.0)
+    window.m3 = 0.5; // Post-Process Sharpening (0.0 to 1.0)
+    window.m4 = 0.5; // Master Layout Seed (0.0 to 1.0)
+    window.triggerPreview = function() { console.log("EditArt: Thumbnail Captured!"); };
+}
+
 let masterSeed=0;function eaRandom(){var t=masterSeed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}
 function hslToRgb(h,s,l,hdrMultiplier=1.0){let r,g,b;if(s===0){r=g=b=l;}else{const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};const q=l<0.5?l*(1+s):l+s-l*s;const p=2*l-q;r=hue2rgb(p,q,h+1/3);g=hue2rgb(p,q,h);b=hue2rgb(p,q,h-1/3);}return[r*hdrMultiplier,g*hdrMultiplier,b*hdrMultiplier];}
 let CONFIG={};function updateConfigFromSliders(){masterSeed=Math.floor((m0+m1*10+m2*100+m3*1000+m4*10000)*1234567);let hdr=1.2+(eaRandom()*0.8);let baseHue=eaRandom();let compHue=(baseHue+0.5)%1.0;let splitHue1=(baseHue+0.25+eaRandom()*0.1)%1.0;let splitHue2=(baseHue+0.75-eaRandom()*0.1)%1.0;let palette=[hslToRgb(baseHue,0.8+eaRandom()*0.2,0.1+eaRandom()*0.1,1.0),hslToRgb(compHue,0.9+eaRandom()*0.1,0.4+eaRandom()*0.1,hdr),hslToRgb(splitHue1,0.8+eaRandom()*0.2,0.5+eaRandom()*0.1,hdr),hslToRgb(splitHue2,0.9+eaRandom()*0.1,0.6+eaRandom()*0.1,hdr*1.2)];let allEffects=Array.from({length:50},(_,i)=>i);for(let i=allEffects.length-1;i>0;i--){const j=Math.floor(eaRandom()*(i+1));[allEffects[i],allEffects[j]]=[allEffects[j],allEffects[i]];}let activeEffects=allEffects.slice(0,7);CONFIG={palette:palette,activeEffects:activeEffects,simulation:{numZones:7,splitDepth:Math.floor(1+m2*4),effectChangeMin:Math.floor(30+m1*60),effectChangeMax:Math.floor(120+m1*240),},movement:{zoneSpeedMax:2.0+m1*6.0,easing:0.05,stutterChance:0.05,stutterMagnitude:30.0},effects:{rainSpeed:-1.2,glitchMagnitude:30.0,explodeMagnitude:4.0,turbulenceMag:2.0+(m1*8.0),shearMagnitude:15.0,twistMagnitude:0.1,jitterMagnitude:4.0,vortexMagnitude:2.0,waveMagnitude:4.0,waveFrequency:0.1,twirlIntensity:0.2,liquifyMagnitude:3.0,barrelPower:1.5,feedbackMagnitude:0.02,feedbackScale:0.01,sharpenIntensity:m3*1.5},shaderSeed:eaRandom()*1000.0};window.editartFeatures={"Complexity":CONFIG.simulation.splitDepth.toString(),"Fluid Speed":m1>0.7?"Fast":m1>0.3?"Moderate":"Slow","Aesthetic Style":m3>0.6?"Hard Edges":"Soft Liquid","Primary Hue":Math.floor(baseHue*360)+" Degrees"};}
