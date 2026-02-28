@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Pixel Drift - Standalone (Sliderless)</title>
+    <title>test</title>
     <style>
         /* Ensure the canvas fills the entire browser window without scrollbars */
         body, html {
@@ -115,7 +115,6 @@
             return [r * hdrMultiplier, g * hdrMultiplier, b * hdrMultiplier];
         }
 
-        // Converts WebGL normalized HDR RGB values back to standard web Hex strings
         function rgbToHex(r, g, b) {
             const toHex = (c) => {
                 const hex = Math.max(0, Math.min(255, Math.round(c * 255))).toString(16).toUpperCase();
@@ -186,23 +185,20 @@
                 "Primary Hue": Math.floor(baseHue * 360) + " Degrees"
             };
 
-            updateOverlayInfo(); // Update UI
+            updateOverlayInfo();
         }
 
-        // Populates the HTML overlay with current configuration details
         function updateOverlayInfo() {
             let overlay = document.getElementById('infoOverlay');
             if(!overlay) return;
 
             let html = "<b>ARTWORK SEED: " + masterSeed + "</b><br><br>";
             
-            // Format colors to hex
             let c0 = rgbToHex(CONFIG.palette[0][0], CONFIG.palette[0][1], CONFIG.palette[0][2]);
             let c1 = rgbToHex(CONFIG.palette[1][0], CONFIG.palette[1][1], CONFIG.palette[1][2]);
             let c2 = rgbToHex(CONFIG.palette[2][0], CONFIG.palette[2][1], CONFIG.palette[2][2]);
             let c3 = rgbToHex(CONFIG.palette[3][0], CONFIG.palette[3][1], CONFIG.palette[3][2]);
 
-            // Layout & Colors conditional mapping
             if (CONFIG.paletteSeed < 0.33) {
                 html += "<b>LAYOUT:</b> Split Screen (Solid)<br>";
                 html += "<b>COLORS:</b><br>";
@@ -223,7 +219,6 @@
             }
 
             html += "<br><b>ACTIVE EFFECTS:</b><br>";
-            // List exactly the first 5 chosen effects
             for(let i = 0; i < 5; i++) {
                 let effId = CONFIG.activeEffects[i];
                 html += "- " + (effectNames[effId] || ("Effect #" + effId)) + "<br>";
@@ -305,9 +300,18 @@
                 vec2 offset = vec2(0.0);
                 vec2 fragCoord = vTexCoord * res;
                 
-                mediump vec4 rects[7] = vec4[](u_rect0, u_rect1, u_rect2, u_rect3, u_rect4, u_rect5, u_rect6);
-                mediump int effects[7] = int[](u_effect0, u_effect1, u_effect2, u_effect3, u_effect4, u_effect5, u_effect6);
-                bool inversions[7] = bool[](u_inverted0, u_inverted1, u_inverted2, u_inverted3, u_inverted4, u_inverted5, u_inverted6);
+                // MOBILE COMPATIBILITY FIX: Explicit array assignment rather than inline vec4[] constructor
+                mediump vec4 rects[7];
+                rects[0] = u_rect0; rects[1] = u_rect1; rects[2] = u_rect2; rects[3] = u_rect3; 
+                rects[4] = u_rect4; rects[5] = u_rect5; rects[6] = u_rect6;
+                
+                mediump int effects[7];
+                effects[0] = u_effect0; effects[1] = u_effect1; effects[2] = u_effect2; effects[3] = u_effect3; 
+                effects[4] = u_effect4; effects[5] = u_effect5; effects[6] = u_effect6;
+                
+                bool inversions[7];
+                inversions[0] = u_inverted0; inversions[1] = u_inverted1; inversions[2] = u_inverted2; inversions[3] = u_inverted3; 
+                inversions[4] = u_inverted4; inversions[5] = u_inverted5; inversions[6] = u_inverted6;
                 
                 int zoneIndex = -1;
                 for(int i = 0; i < 7; i++) {
@@ -411,9 +415,18 @@
                 vec2 fragCoord = vTexCoord * res;
                 ivec2 p = ivec2(fragCoord);
                 
-                mediump vec4 rects[7] = vec4[](u_rect0, u_rect1, u_rect2, u_rect3, u_rect4, u_rect5, u_rect6);
-                mediump int effects[7] = int[](u_effect0, u_effect1, u_effect2, u_effect3, u_effect4, u_effect5, u_effect6);
-                bool inversions[7] = bool[](u_inverted0, u_inverted1, u_inverted2, u_inverted3, u_inverted4, u_inverted5, u_inverted6);
+                // MOBILE COMPATIBILITY FIX: Explicit array assignment
+                mediump vec4 rects[7];
+                rects[0] = u_rect0; rects[1] = u_rect1; rects[2] = u_rect2; rects[3] = u_rect3; 
+                rects[4] = u_rect4; rects[5] = u_rect5; rects[6] = u_rect6;
+                
+                mediump int effects[7];
+                effects[0] = u_effect0; effects[1] = u_effect1; effects[2] = u_effect2; effects[3] = u_effect3; 
+                effects[4] = u_effect4; effects[5] = u_effect5; effects[6] = u_effect6;
+                
+                bool inversions[7];
+                inversions[0] = u_inverted0; inversions[1] = u_inverted1; inversions[2] = u_inverted2; inversions[3] = u_inverted3; 
+                inversions[4] = u_inverted4; inversions[5] = u_inverted5; inversions[6] = u_inverted6;
                 
                 ivec2 sourceCoord = p + ivec2(getShift(p));
                 int zoneIndex = -1;
@@ -566,7 +579,10 @@
                 shdPush  = createShader(vertShader, PixelUpdateShader);
                 shdPost  = createShader(vertShader, PostProcessShader);
             } catch (e) {
-                console.error("Shader failed to compile: " + e.message);
+                // If shaders fail (common on old mobile devices), print error visibly on screen!
+                document.body.innerHTML = `<div style="background:white; color:red; padding:20px; font-family:monospace; font-size: 14px; width:100%; height:100%; overflow:auto;">
+                    <b>WEBGL SHADER ERROR:</b><br><br>${e.message.replace(/\n/g, '<br>')}
+                </div>`;
                 return;
             }
 
