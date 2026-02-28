@@ -35,12 +35,6 @@
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8); /* Ensures readability over bright colors */
             white-space: pre;
         }
-
-        /* Show overlay when hovering (Desktop) or when toggled via JS (Mobile) */
-        body:hover #infoOverlay,
-        #infoOverlay.visible {
-            opacity: 1;
-        }
     </style>
     <!-- Import p5.js library directly from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
@@ -49,11 +43,39 @@
     <div id="infoOverlay"></div>
 
     <script>
-        // Toggle the overlay on tap/click for mobile devices
+        // Manage overlay visibility robustly across desktop and mobile
+        window.isOverlayManuallyHidden = false;
+
         window.addEventListener('pointerdown', function() {
             let overlay = document.getElementById('infoOverlay');
             if (overlay) {
-                overlay.classList.toggle('visible');
+                let currentOpacity = window.getComputedStyle(overlay).opacity;
+                if (currentOpacity === '1' || overlay.style.opacity === '1') {
+                    overlay.style.opacity = '0';
+                    window.isOverlayManuallyHidden = true;
+                } else {
+                    overlay.style.opacity = '1';
+                    window.isOverlayManuallyHidden = false;
+                }
+            }
+        });
+
+        // Show on mouse move (desktop only), unless manually hidden by click
+        window.addEventListener('pointermove', function(e) {
+            if (e.pointerType === 'mouse') {
+                let overlay = document.getElementById('infoOverlay');
+                if (overlay && !window.isOverlayManuallyHidden) {
+                    overlay.style.opacity = '1';
+                }
+            }
+        });
+
+        // Hide when mouse leaves the window entirely
+        document.addEventListener('mouseleave', function(e) {
+            let overlay = document.getElementById('infoOverlay');
+            if (overlay) {
+                overlay.style.opacity = '0';
+                window.isOverlayManuallyHidden = false; // Reset toggle state
             }
         });
 
