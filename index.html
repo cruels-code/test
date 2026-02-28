@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Drift - Standalone</title>
+    <title>Pixel Drift - Standalone (Sliderless)</title>
     <style>
         /* Ensure the canvas fills the entire browser window without scrollbars */
         body, html {
@@ -23,25 +23,20 @@
         // ==========================================================
         // 1. MOCK EDITART ENVIRONMENT (For Local Testing)
         // ==========================================================
-        // EditArt automatically injects m0 through m4 as global variables.
-        // We mock them here so the file runs perfectly when opened locally.
-        if (typeof window.m0 === 'undefined') {
-            console.log("Mocking EditArt parameters for local testing...");
-            window.m0 = 0.5; // Color Palette Seed (0.0 to 1.0)
-            window.m1 = 0.5; // Effect Speed / Turbulence (0.0 to 1.0)
-            window.m2 = 0.5; // Zone Split Depth (Complexity) (0.0 to 1.0)
-            window.m3 = 0.5; // Post-Process Sharpening (0.0 to 1.0)
-            window.m4 = 0.5; // Master Layout Seed (0.0 to 1.0)
+        // For sliderless drops, EditArt only needs triggerPreview.
+        // We mock it here so the file runs perfectly when opened locally.
+        if (typeof window.triggerPreview === 'undefined') {
             window.triggerPreview = function() { console.log("EditArt: Thumbnail Captured!"); };
         }
 
         // ==========================================================
         // 2. DETERMINISTIC PRNG (Pseudo-Random Number Generator)
         // ==========================================================
-        // Generative art platforms require deterministic randomness.
-        // We replace Math.random() with a seeded generator so that the 
-        // same combination of sliders always produces the exact same result.
-        let masterSeed = 0;
+        // For a sliderless drop, we generate a random seed on the first load.
+        // Then we use our deterministic generator for everything else so the 
+        // traits match the visuals perfectly.
+        let masterSeed = Math.floor(Math.random() * 999999999);
+        
         function eaRandom() {
             var t = masterSeed += 0x6D2B79F5;
             t = Math.imul(t ^ t >>> 15, t | 1);
@@ -78,13 +73,16 @@
         }
 
         // ==========================================================
-        // 4. GLOBAL ENGINE CONFIGURATION
+        // 4. GLOBAL ENGINE CONFIGURATION (Sliderless)
         // ==========================================================
         let CONFIG = {};
 
-        function updateConfigFromSliders() {
-            // Seed the PRNG using a mathematical mix of all 5 sliders
-            masterSeed = Math.floor((m0 + m1 * 10 + m2 * 100 + m3 * 1000 + m4 * 10000) * 1234567);
+        function generateRandomConfig() {
+            // Generate random internal parameters to replace the old sliders
+            let p_palette = eaRandom();
+            let p_speed   = eaRandom();
+            let p_depth   = eaRandom();
+            let p_sharpen = eaRandom();
             
             let hdr = 1.2 + (eaRandom() * 0.8); // Randomize Neon intensity
             
@@ -111,32 +109,33 @@
             
             // Populate the master configuration object
             CONFIG = {
+                paletteSeed: p_palette,
                 palette: palette,
                 activeEffects: activeEffects,
                 simulation: {
                     numZones: 7, 
-                    splitDepth: Math.floor(1 + m2 * 4), // Mapped to m2 slider
-                    effectChangeMin: Math.floor(30 + m1 * 60),
-                    effectChangeMax: Math.floor(120 + m1 * 240),
+                    splitDepth: Math.floor(1 + p_depth * 4), 
+                    effectChangeMin: Math.floor(30 + p_speed * 60),
+                    effectChangeMax: Math.floor(120 + p_speed * 240),
                 },
                 movement: {
-                    zoneSpeedMax: 2.0 + m1 * 6.0,
+                    zoneSpeedMax: 2.0 + p_speed * 6.0,
                     easing: 0.05,
                     stutterChance: 0.05,
                     stutterMagnitude: 30.0
                 },
                 effects: {
-                    turbulenceMag: 2.0 + (m1 * 8.0),
-                    sharpenIntensity: m3 * 1.5 
+                    turbulenceMag: 2.0 + (p_speed * 8.0),
+                    sharpenIntensity: p_sharpen * 1.5 
                 },
                 shaderSeed: eaRandom() * 1000.0 
             };
 
-            // Register Traits for the NFT Marketplace
+            // Register Traits for the NFT Marketplace (Sliderless drops still need traits!)
             window.editartFeatures = {
                 "Complexity": CONFIG.simulation.splitDepth.toString(),
-                "Fluid Speed": m1 > 0.7 ? "Fast" : m1 > 0.3 ? "Moderate" : "Slow",
-                "Aesthetic Style": m3 > 0.6 ? "Hard Edges" : "Soft Liquid",
+                "Fluid Speed": p_speed > 0.7 ? "Fast" : p_speed > 0.3 ? "Moderate" : "Slow",
+                "Aesthetic Style": p_sharpen > 0.6 ? "Hard Edges" : "Soft Liquid",
                 "Primary Hue": Math.floor(baseHue * 360) + " Degrees"
             };
         }
@@ -170,7 +169,7 @@
                 vec2 uv = vTexCoord;
                 vec3 color = vec3(0.0);
                 
-                // Determine layout based on slider m0
+                // Determine layout based on random paletteSeed
                 if(u_paletteSeed < 0.33) {
                     color = uv.x < 0.5 ? u_color0 : u_color1;
                 } else if(u_paletteSeed < 0.66) {
@@ -481,7 +480,6 @@
         let rectManager;
         let layer1Effects = [];
         let previewTriggered = false;
-        let prevM0, prevM1, prevM2, prevM3, prevM4;
 
         function setup() {
             setAttributes('antialias', false); // Hard pixel edges
@@ -508,12 +506,9 @@
             initArtwork();
         }
 
-        // Bootstraps or resets the artwork if sliders change
+        // Bootstraps the random artwork setup
         function initArtwork() {
-            updateConfigFromSliders();
-
-            // Track state for changes
-            prevM0 = m0; prevM1 = m1; prevM2 = m2; prevM3 = m3; prevM4 = m4;
+            generateRandomConfig();
             
             rectManager = new RectangleManager(width, height, CONFIG.simulation.splitDepth, 0, CONFIG.simulation.numZones);
             rectManager.initializeRectangles();
@@ -524,7 +519,7 @@
             clear();
             shader(shdInit);
             shdInit.setUniform('u_gridSize', [width, height]);
-            shdInit.setUniform('u_paletteSeed', m0);
+            shdInit.setUniform('u_paletteSeed', CONFIG.paletteSeed);
             shdInit.setUniform('u_color0', CONFIG.palette[0]);
             shdInit.setUniform('u_color1', CONFIG.palette[1]);
             shdInit.setUniform('u_color2', CONFIG.palette[2]);
@@ -536,7 +531,7 @@
             clear();
             shader(shdInit);
             shdInit.setUniform('u_gridSize', [width, height]);
-            shdInit.setUniform('u_paletteSeed', m0);
+            shdInit.setUniform('u_paletteSeed', CONFIG.paletteSeed);
             shdInit.setUniform('u_color0', CONFIG.palette[0]);
             shdInit.setUniform('u_color1', CONFIG.palette[1]);
             shdInit.setUniform('u_color2', CONFIG.palette[2]);
@@ -554,16 +549,11 @@
         }
 
         function draw() {
-            // Hot-reload logic for sliders
-            if (m0 !== prevM0 || m1 !== prevM1 || m2 !== prevM2 || m3 !== prevM3 || m4 !== prevM4) {
-                initArtwork();
-            }
-
             if (!shdPush) return; 
 
             // Trigger preview for marketplace thumbnail after 180 frames (roughly 3 seconds)
-            if (!previewTriggered && frameCount > 180 && typeof triggerPreview === 'function') {
-                triggerPreview();
+            if (!previewTriggered && frameCount > 180 && typeof window.triggerPreview === 'function') {
+                window.triggerPreview();
                 previewTriggered = true;
             }
 
@@ -642,6 +632,9 @@
             prevFbo.resize(width, height);
             nextFbo.resize(width, height);
             shiftFbo.resize(width, height);
+            
+            // Re-seed with the same initial masterSeed so resizing doesn't change the artwork completely
+            masterSeed = Math.floor(masterSeed); 
             initArtwork();
         }
 
