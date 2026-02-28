@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Drift - Standalone (Sliderless)</title>
+    <title>test</title>
     <style>
         /* Ensure the canvas fills the entire browser window without scrollbars */
         body, html {
@@ -14,27 +14,46 @@
             overflow: hidden;
             background-color: #000;
         }
+
+        /* Overlay for Info */
+        #infoOverlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.7); /* 30% transparent */
+            pointer-events: none; /* Allows clicking/hovering through the text */
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            z-index: 100;
+            line-height: 1.5;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8); /* Ensures readability over bright colors */
+            white-space: pre;
+        }
+
+        /* Show overlay when hovering over the window */
+        body:hover #infoOverlay {
+            opacity: 1;
+        }
     </style>
     <!-- Import p5.js library directly from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
 </head>
 <body>
+    <div id="infoOverlay"></div>
+
     <script>
         // ==========================================================
         // 1. MOCK EDITART ENVIRONMENT (For Local Testing)
         // ==========================================================
-        // For sliderless drops, EditArt only needs triggerPreview.
-        // We mock it here so the file runs perfectly when opened locally.
         if (typeof window.triggerPreview === 'undefined') {
             window.triggerPreview = function() { console.log("EditArt: Thumbnail Captured!"); };
         }
 
         // ==========================================================
-        // 2. DETERMINISTIC PRNG (Pseudo-Random Number Generator)
+        // 2. DETERMINISTIC PRNG & HUMAN-READABLE MAPPINGS
         // ==========================================================
-        // For a sliderless drop, we generate a random seed on the first load.
-        // Then we use our deterministic generator for everything else so the 
-        // traits match the visuals perfectly.
         let masterSeed = Math.floor(Math.random() * 999999999);
         
         function eaRandom() {
@@ -44,12 +63,23 @@
             return ((t ^ t >>> 14) >>> 0) / 4294967296;
         }
 
+        // Map integer effect IDs to human readable names for the overlay
+        const effectNames = [
+            "Vertical Pan", "Horizontal Jitter", "Outward Push", "Turbulence Noise", "Vertical Shear", 
+            "Swirl", "Scanline Shift", "Static Noise", "Color Bleed", "Vortex", 
+            "Sine Wave Y", "Twist", "Circular Noise", "Pinch", "Zoom/Scale", 
+            "Pixelate Shift", "Sine Wave X", "Random Scatter", "Wind Right", "Spiral Out", 
+            "Bulge", "Dent", "Stretch X", "Stretch Y", "Ripple", 
+            "Pulsate", "Lens Distortion", "Kaleidoscope", "Fold", "Orbit", 
+            "Lissajous", "Blocky Noise", "ZigZag", "Vortex Ripple", "Noise Drip", 
+            "Scanline Drip", "Binary Noise", "Smear Right", "Smear Left", "Radial Bands", 
+            "Fish Eye", "Tear", "Diagonal Split", "Star Burst", "Grid Warp", 
+            "Implode", "Zoom Pulse", "Invert (Color)", "Droplet Swell", "Snake Wriggle"
+        ];
+
         // ==========================================================
-        // 3. COLOR GENERATION UTILITY
+        // 3. COLOR GENERATION & UTILITIES
         // ==========================================================
-        // Converts HSL values to RGB arrays for WebGL shaders.
-        // Includes an HDR (High Dynamic Range) multiplier to push colors 
-        // past 1.0, creating bright, blown-out neon effects when blending.
         function hslToRgb(h, s, l, hdrMultiplier = 1.0) {
             let r, g, b;
             if (s === 0) {
@@ -72,34 +102,40 @@
             return [r * hdrMultiplier, g * hdrMultiplier, b * hdrMultiplier];
         }
 
+        // Converts WebGL normalized HDR RGB values back to standard web Hex strings
+        function rgbToHex(r, g, b) {
+            const toHex = (c) => {
+                const hex = Math.max(0, Math.min(255, Math.round(c * 255))).toString(16).toUpperCase();
+                return hex.length === 1 ? "0" + hex : hex;
+            };
+            return "#" + toHex(r) + toHex(g) + toHex(b);
+        }
+
         // ==========================================================
-        // 4. GLOBAL ENGINE CONFIGURATION (Sliderless)
+        // 4. GLOBAL ENGINE CONFIGURATION & OVERLAY
         // ==========================================================
         let CONFIG = {};
 
         function generateRandomConfig() {
-            // Generate random internal parameters to replace the old sliders
             let p_palette = eaRandom();
             let p_speed   = eaRandom();
             let p_depth   = eaRandom();
             let p_sharpen = eaRandom();
             
-            let hdr = 1.2 + (eaRandom() * 0.8); // Randomize Neon intensity
+            let hdr = 1.2 + (eaRandom() * 0.8); 
             
-            // Calculate a mathematically contrasting color palette
             let baseHue = eaRandom();
             let compHue = (baseHue + 0.5) % 1.0; 
             let splitHue1 = (baseHue + 0.25 + eaRandom() * 0.1) % 1.0;
             let splitHue2 = (baseHue + 0.75 - eaRandom() * 0.1) % 1.0;
             
             let palette = [
-                hslToRgb(baseHue, 0.8 + eaRandom() * 0.2, 0.1 + eaRandom() * 0.1, 1.0), // Dark anchor
-                hslToRgb(compHue, 0.9 + eaRandom() * 0.1, 0.4 + eaRandom() * 0.1, hdr), // Complementary
-                hslToRgb(splitHue1, 0.8 + eaRandom() * 0.2, 0.5 + eaRandom() * 0.1, hdr), // Accent 1
-                hslToRgb(splitHue2, 0.9 + eaRandom() * 0.1, 0.6 + eaRandom() * 0.1, hdr * 1.2) // Highlight
+                hslToRgb(baseHue, 0.8 + eaRandom() * 0.2, 0.1 + eaRandom() * 0.1, 1.0), 
+                hslToRgb(compHue, 0.9 + eaRandom() * 0.1, 0.4 + eaRandom() * 0.1, hdr), 
+                hslToRgb(splitHue1, 0.8 + eaRandom() * 0.2, 0.5 + eaRandom() * 0.1, hdr), 
+                hslToRgb(splitHue2, 0.9 + eaRandom() * 0.1, 0.6 + eaRandom() * 0.1, hdr * 1.2) 
             ];
 
-            // Select 7 specific visual effects from the pool of 50
             let allEffects = Array.from({length: 50}, (_, i) => i);
             for (let i = allEffects.length - 1; i > 0; i--) {
                 const j = Math.floor(eaRandom() * (i + 1));
@@ -107,7 +143,6 @@
             }
             let activeEffects = allEffects.slice(0, 7);
             
-            // Populate the master configuration object
             CONFIG = {
                 paletteSeed: p_palette,
                 palette: palette,
@@ -131,19 +166,62 @@
                 shaderSeed: eaRandom() * 1000.0 
             };
 
-            // Register Traits for the NFT Marketplace (Sliderless drops still need traits!)
             window.editartFeatures = {
                 "Complexity": CONFIG.simulation.splitDepth.toString(),
                 "Fluid Speed": p_speed > 0.7 ? "Fast" : p_speed > 0.3 ? "Moderate" : "Slow",
                 "Aesthetic Style": p_sharpen > 0.6 ? "Hard Edges" : "Soft Liquid",
                 "Primary Hue": Math.floor(baseHue * 360) + " Degrees"
             };
+
+            updateOverlayInfo(); // Update UI
+        }
+
+        // Populates the HTML overlay with current configuration details
+        function updateOverlayInfo() {
+            let overlay = document.getElementById('infoOverlay');
+            if(!overlay) return;
+
+            let html = "<b>ARTWORK SEED: " + masterSeed + "</b><br><br>";
+            
+            // Format colors to hex
+            let c0 = rgbToHex(CONFIG.palette[0][0], CONFIG.palette[0][1], CONFIG.palette[0][2]);
+            let c1 = rgbToHex(CONFIG.palette[1][0], CONFIG.palette[1][1], CONFIG.palette[1][2]);
+            let c2 = rgbToHex(CONFIG.palette[2][0], CONFIG.palette[2][1], CONFIG.palette[2][2]);
+            let c3 = rgbToHex(CONFIG.palette[3][0], CONFIG.palette[3][1], CONFIG.palette[3][2]);
+
+            // Layout & Colors conditional mapping
+            if (CONFIG.paletteSeed < 0.33) {
+                html += "<b>LAYOUT:</b> Split Screen (Solid)<br>";
+                html += "<b>COLORS:</b><br>";
+                html += `- Left:  ${c0}<br>`;
+                html += `- Right: ${c1}<br>`;
+            } else if (CONFIG.paletteSeed < 0.66) {
+                html += "<b>LAYOUT:</b> Full Screen Gradient<br>";
+                html += "<b>COLORS:</b><br>";
+                html += `- Top:    ${c0} → ${c2}<br>`;
+                html += `- Bottom: ${c1} → ${c3}<br>`;
+            } else {
+                html += "<b>LAYOUT:</b> Geometric Quad (Solid)<br>";
+                html += "<b>COLORS:</b><br>";
+                html += `- Top Left:     ${c0}<br>`;
+                html += `- Top Right:    ${c1}<br>`;
+                html += `- Bottom Left:  ${c2}<br>`;
+                html += `- Bottom Right: ${c3}<br>`;
+            }
+
+            html += "<br><b>ACTIVE EFFECTS:</b><br>";
+            // List exactly the first 5 chosen effects
+            for(let i = 0; i < 5; i++) {
+                let effId = CONFIG.activeEffects[i];
+                html += "- " + (effectNames[effId] || ("Effect #" + effId)) + "<br>";
+            }
+
+            overlay.innerHTML = html;
         }
 
         // ==========================================================
         // 5. GLSL SHADERS (WEBGL 2.0)
         // ==========================================================
-        // Standard passthrough vertex shader
         const vertShader = `#version 300 es
             in vec3 aPosition;
             in vec2 aTexCoord;
@@ -153,7 +231,6 @@
                 gl_Position = vec4(aPosition, 1.0);
             }`;
 
-        // Generates the very first frame of the artwork (gradients, grids, splits)
         const InitialPixelShader = `#version 300 es
             precision mediump float;
             uniform vec2 u_gridSize;
@@ -169,7 +246,6 @@
                 vec2 uv = vTexCoord;
                 vec3 color = vec3(0.0);
                 
-                // Determine layout based on random paletteSeed
                 if(u_paletteSeed < 0.33) {
                     color = uv.x < 0.5 ? u_color0 : u_color1;
                 } else if(u_paletteSeed < 0.66) {
@@ -185,7 +261,6 @@
                 fragColor = vec4(color, 1.0);
             }`;
 
-        // Calculates how far every pixel should move this frame based on math/physics
         const PixelDisplacementShader = `#version 300 es
             precision mediump float;
             precision mediump int;
@@ -217,7 +292,6 @@
                 vec2 offset = vec2(0.0);
                 vec2 fragCoord = vTexCoord * res;
                 
-                // Unpack uniforms into arrays for iteration
                 mediump vec4 rects[7] = vec4[](u_rect0, u_rect1, u_rect2, u_rect3, u_rect4, u_rect5, u_rect6);
                 mediump int effects[7] = int[](u_effect0, u_effect1, u_effect2, u_effect3, u_effect4, u_effect5, u_effect6);
                 bool inversions[7] = bool[](u_inverted0, u_inverted1, u_inverted2, u_inverted3, u_inverted4, u_inverted5, u_inverted6);
@@ -229,7 +303,6 @@
                     if (insideBox(vTexCoord, bl, tr)) { zoneIndex = i; break; }
                 }
                 
-                // The master list of 50 fluid/math effects
                 if (zoneIndex != -1) {
                     int eff = effects[zoneIndex];
                     vec2 center = rects[zoneIndex].xy + rects[zoneIndex].zw * 0.5;
@@ -293,13 +366,11 @@
                     if (inversions[zoneIndex]) offset *= -1.0;
                 }
                 
-                // Pack displacement vectors into color channels
                 vec2 offPix = floor(offset * res + 0.5);
                 offPix = clamp(offPix, -1.0, 1.0);
                 fragColor = vec4((offPix.x + 1.0) * 0.5, (offPix.y + 1.0) * 0.5, 0.0, 1.0);
             }`;
 
-        // Uses the offset map generated above to physically push colors around the canvas
         const PixelUpdateShader = `#version 300 es
             precision mediump float;
             precision mediump int;
@@ -348,10 +419,9 @@
                 vec2 sourceUV = (vec2(sourceCoord) + 0.5) / res;
                 vec4 pc = texture(u_previousPrimaryColor, sourceUV);
                 
-                // Direct color manipulation effects
                 if (zoneIndex != -1) {
                     int eff = effects[zoneIndex];
-                    if (eff == 47) { pc.rgb = 1.0 - pc.rgb; } // Invert colors
+                    if (eff == 47) { pc.rgb = 1.0 - pc.rgb; } 
                     else if (eff == 49) { 
                         float lum = dot(pc.rgb, vec3(0.299, 0.587, 0.114));
                         float noiseScale = random(fragCoord + u_frameCount * 0.1);
@@ -361,7 +431,6 @@
                 fragColor = pc;
             }`;
 
-        // Final pass before rendering to screen (handles sharpening)
         const PostProcessShader = `#version 300 es
             precision mediump float;
             precision mediump int;
@@ -379,7 +448,6 @@
                 vec4 left   = texture(u_primaryColorIn, vTexCoord + vec2(-texel.x, 0.0));
                 vec4 right  = texture(u_primaryColorIn, vTexCoord + vec2(texel.x, 0.0));
                 
-                // Laplacian edge sharpening convolution
                 vec4 sharpened = center * 5.0 - top - bottom - left - right;
                 fragColor = clamp(mix(center, sharpened, u_sharpenIntensity), 0.0, 1.0);
             }`;
@@ -387,8 +455,6 @@
         // ==========================================================
         // 6. RECTANGLE / ZONE MANAGER
         // ==========================================================
-        // Manages the physics, size, and bouncing of the unseen 
-        // bounding boxes that contain the different physics effects.
         class RectangleManager {
             constructor(gridCols, gridRows, splitDepth, spacing, maxRectangleCount) {
                 this.gridCols = gridCols;
@@ -399,20 +465,17 @@
                 this.rectangles = [];
             }
 
-            // Initializes rectangles using a recursive spatial split
             initializeRectangles() {
                 this.rectangles = [];
                 const container = { x: 0, y: 0, width: Math.floor(this.gridCols), height: Math.floor(this.gridRows) };
                 this.splitSpace(container, 0);
                 if (this.rectangles.length > this.maxRectangleCount) this.rectangles.length = this.maxRectangleCount;
                 
-                // Pad with empty rectangles if we didn't hit our max depth
                 while (this.rectangles.length < this.maxRectangleCount) {
                     this.rectangles.push({ x: 0, y: 0, width: 0, height: 0, vx: 0, vy: 0, targetVx: 0, targetVy: 0 });
                 }
             }
 
-            // Recursively chops the screen into smaller zones
             splitSpace(container, depth) {
                 if (depth >= this.splitDepth || this.rectangles.length >= this.maxRectangleCount) {
                     const vx = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax;
@@ -440,7 +503,6 @@
                 }
             }
 
-            // Updates zone movement vectors and handles screen-edge bouncing
             update() {
                 this.rectangles.forEach(rect => {
                     if (rect.width === 0) return;
@@ -457,7 +519,6 @@
                     rect.x += rect.vx;
                     rect.y += rect.vy;
                     
-                    // Bounce off edges
                     if (rect.x <= 0 || rect.x + rect.width >= this.gridCols) {
                         rect.vx *= -1; rect.targetVx *= -1;
                     }
@@ -465,7 +526,6 @@
                         rect.vy *= -1; rect.targetVy *= -1;
                     }
                     
-                    // Clamp inside bounds
                     rect.x = Math.max(0, Math.min(rect.x, this.gridCols - rect.width));
                     rect.y = Math.max(0, Math.min(rect.y, this.gridRows - rect.height));
                 });
@@ -482,12 +542,11 @@
         let previewTriggered = false;
 
         function setup() {
-            setAttributes('antialias', false); // Hard pixel edges
+            setAttributes('antialias', false); 
             createCanvas(windowWidth, windowHeight, WEBGL);
             pixelDensity(1); 
-            noCursor(); // Hide mouse
+            noCursor(); 
 
-            // Compile shaders
             try {
                 shdInit  = createShader(vertShader, InitialPixelShader);
                 shdShift = createShader(vertShader, PixelDisplacementShader);
@@ -498,7 +557,6 @@
                 return;
             }
 
-            // Create WebGL 2.0 Framebuffers for ping-pong feedback loop
             prevFbo  = createFramebuffer();
             nextFbo  = createFramebuffer();
             shiftFbo = createFramebuffer();
@@ -506,7 +564,6 @@
             initArtwork();
         }
 
-        // Bootstraps the random artwork setup
         function initArtwork() {
             generateRandomConfig();
             
@@ -514,7 +571,6 @@
             rectManager.initializeRectangles();
             assignRandomEffects();
 
-            // Render the initial color layouts to the buffers
             prevFbo.begin();
             clear();
             shader(shdInit);
@@ -540,7 +596,6 @@
             nextFbo.end();
         }
 
-        // Helper to draw a full-canvas quad for shader application
         function fullScreenQuad() {
             beginShape(TRIANGLES);
             vertex(-1, -1, 0, 0, 0); vertex(1, -1, 0, 1, 0); vertex(-1, 1, 0, 0, 1);
@@ -551,7 +606,6 @@
         function draw() {
             if (!shdPush) return; 
 
-            // Trigger preview for marketplace thumbnail after 180 frames (roughly 3 seconds)
             if (!previewTriggered && frameCount > 180 && typeof window.triggerPreview === 'function') {
                 window.triggerPreview();
                 previewTriggered = true;
@@ -559,7 +613,6 @@
 
             const currentTime = frameCount;
 
-            // Manage time-based effect rotations randomly
             layer1Effects.forEach((effect) => {
                 if (currentTime - effect.lastResetTime > effect.nextResetInterval) {
                     effect.id = CONFIG.activeEffects[Math.floor(eaRandom() * 7)];
@@ -571,7 +624,6 @@
 
             rectManager.update();
             
-            // PASS 1: Render vector displacement map
             shiftFbo.begin();
             clear();
             shader(shdShift);
@@ -592,7 +644,6 @@
             fullScreenQuad();
             shiftFbo.end();
 
-            // PASS 2: Read vector map, push colors from prevFbo to nextFbo
             nextFbo.begin();
             clear();
             shader(shdPush);
@@ -613,12 +664,10 @@
             fullScreenQuad();
             nextFbo.end();
 
-            // PASS 3: Swap Buffers (Feedback Loop)
             let temp = prevFbo;
             prevFbo = nextFbo;
             nextFbo = temp;
 
-            // PASS 4: Render to Canvas with Post Processing (Sharpening)
             clear();
             shader(shdPost);
             shdPost.setUniform('u_primaryColorIn', nextFbo);
@@ -633,7 +682,6 @@
             nextFbo.resize(width, height);
             shiftFbo.resize(width, height);
             
-            // Re-seed with the same initial masterSeed so resizing doesn't change the artwork completely
             masterSeed = Math.floor(masterSeed); 
             initArtwork();
         }
