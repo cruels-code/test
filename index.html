@@ -1,30 +1,662 @@
-// ==========================================================
-// MOCK EDITART ENVIRONMENT (For Local Testing) 
-// In production, the platform injects its own parameters here.
-// ==========================================================
-if (typeof window.m0 === 'undefined') {
-    console.log("Mocking EditArt parameters for local testing...");
-    window.m0 = 0.5; // Color Palette Seed (0.0 to 1.0)
-    window.m1 = 0.5; // Effect Speed / Turbulence (0.0 to 1.0)
-    window.m2 = 0.5; // Zone Split Depth (Complexity) (0.0 to 1.0)
-    window.m3 = 0.5; // Post-Process Sharpening (0.0 to 1.0)
-    window.m4 = 0.5; // Master Layout Seed (0.0 to 1.0)
-    window.triggerPreview = function() { console.log("EditArt: Thumbnail Captured!"); };
-}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Drift - Standalone</title>
+    <style>
+        /* Ensure the canvas fills the entire browser window without scrollbars */
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #000;
+        }
+    </style>
+    <!-- Import p5.js library directly from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+</head>
+<body>
+    <script>
+        // ==========================================================
+        // 1. MOCK EDITART ENVIRONMENT (For Local Testing)
+        // ==========================================================
+        // EditArt automatically injects m0 through m4 as global variables.
+        // We mock them here so the file runs perfectly when opened locally.
+        if (typeof window.m0 === 'undefined') {
+            console.log("Mocking EditArt parameters for local testing...");
+            window.m0 = 0.5; // Color Palette Seed (0.0 to 1.0)
+            window.m1 = 0.5; // Effect Speed / Turbulence (0.0 to 1.0)
+            window.m2 = 0.5; // Zone Split Depth (Complexity) (0.0 to 1.0)
+            window.m3 = 0.5; // Post-Process Sharpening (0.0 to 1.0)
+            window.m4 = 0.5; // Master Layout Seed (0.0 to 1.0)
+            window.triggerPreview = function() { console.log("EditArt: Thumbnail Captured!"); };
+        }
 
-let masterSeed=0;function eaRandom(){var t=masterSeed+=0x6D2B79F5;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;}
-function hslToRgb(h,s,l,hdrMultiplier=1.0){let r,g,b;if(s===0){r=g=b=l;}else{const hue2rgb=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p;};const q=l<0.5?l*(1+s):l+s-l*s;const p=2*l-q;r=hue2rgb(p,q,h+1/3);g=hue2rgb(p,q,h);b=hue2rgb(p,q,h-1/3);}return[r*hdrMultiplier,g*hdrMultiplier,b*hdrMultiplier];}
-let CONFIG={};function updateConfigFromSliders(){masterSeed=Math.floor((m0+m1*10+m2*100+m3*1000+m4*10000)*1234567);let hdr=1.2+(eaRandom()*0.8);let baseHue=eaRandom();let compHue=(baseHue+0.5)%1.0;let splitHue1=(baseHue+0.25+eaRandom()*0.1)%1.0;let splitHue2=(baseHue+0.75-eaRandom()*0.1)%1.0;let palette=[hslToRgb(baseHue,0.8+eaRandom()*0.2,0.1+eaRandom()*0.1,1.0),hslToRgb(compHue,0.9+eaRandom()*0.1,0.4+eaRandom()*0.1,hdr),hslToRgb(splitHue1,0.8+eaRandom()*0.2,0.5+eaRandom()*0.1,hdr),hslToRgb(splitHue2,0.9+eaRandom()*0.1,0.6+eaRandom()*0.1,hdr*1.2)];let allEffects=Array.from({length:50},(_,i)=>i);for(let i=allEffects.length-1;i>0;i--){const j=Math.floor(eaRandom()*(i+1));[allEffects[i],allEffects[j]]=[allEffects[j],allEffects[i]];}let activeEffects=allEffects.slice(0,7);CONFIG={palette:palette,activeEffects:activeEffects,simulation:{numZones:7,splitDepth:Math.floor(1+m2*4),effectChangeMin:Math.floor(30+m1*60),effectChangeMax:Math.floor(120+m1*240),},movement:{zoneSpeedMax:2.0+m1*6.0,easing:0.05,stutterChance:0.05,stutterMagnitude:30.0},effects:{rainSpeed:-1.2,glitchMagnitude:30.0,explodeMagnitude:4.0,turbulenceMag:2.0+(m1*8.0),shearMagnitude:15.0,twistMagnitude:0.1,jitterMagnitude:4.0,vortexMagnitude:2.0,waveMagnitude:4.0,waveFrequency:0.1,twirlIntensity:0.2,liquifyMagnitude:3.0,barrelPower:1.5,feedbackMagnitude:0.02,feedbackScale:0.01,sharpenIntensity:m3*1.5},shaderSeed:eaRandom()*1000.0};window.editartFeatures={"Complexity":CONFIG.simulation.splitDepth.toString(),"Fluid Speed":m1>0.7?"Fast":m1>0.3?"Moderate":"Slow","Aesthetic Style":m3>0.6?"Hard Edges":"Soft Liquid","Primary Hue":Math.floor(baseHue*360)+" Degrees"};}
-const vertShader=`#version 300 es\nin vec3 aPosition;in vec2 aTexCoord;out vec2 vTexCoord;void main(){vTexCoord=aTexCoord;gl_Position=vec4(aPosition,1.0);}`;
-const InitialPixelShader=`#version 300 es\nprecision mediump float;uniform vec2 u_gridSize;uniform float u_paletteSeed;uniform vec3 u_color0;uniform vec3 u_color1;uniform vec3 u_color2;uniform vec3 u_color3;in vec2 vTexCoord;out vec4 fragColor;void main(){vec2 uv=vTexCoord;vec3 color=vec3(0.0);if(u_paletteSeed<0.33){color=uv.x<0.5?u_color0:u_color1;}else if(u_paletteSeed<0.66){vec3 topMix=mix(u_color0,u_color2,uv.x);vec3 botMix=mix(u_color1,u_color3,uv.x);color=mix(topMix,botMix,uv.y);}else{if(uv.x<0.5&&uv.y<0.5)color=u_color0;else if(uv.x>=0.5&&uv.y<0.5)color=u_color1;else if(uv.x<0.5&&uv.y>=0.5)color=u_color2;else color=u_color3;}fragColor=vec4(color,1.0);}`;
-const PixelDisplacementShader=`#version 300 es\nprecision mediump float;precision mediump int;in vec2 vTexCoord;uniform mediump float u_frameCount;uniform mediump float u_seed;uniform mediump vec2 u_gridSize;uniform mediump vec4 u_rect0,u_rect1,u_rect2,u_rect3,u_rect4,u_rect5,u_rect6;uniform mediump int u_effect0,u_effect1,u_effect2,u_effect3,u_effect4,u_effect5,u_effect6;uniform bool u_inverted0,u_inverted1,u_inverted2,u_inverted3,u_inverted4,u_inverted5,u_inverted6;uniform sampler2D u_previousPrimaryColor;uniform float u_turbulence;uniform float u_zoneSpeedMax;out vec4 fragColor;float random(vec2 st){return fract(sin(dot(st.xy,vec2(12.9898,78.233))+u_seed)*43758.5453123);}float noise(vec2 st){vec2 i=floor(st);vec2 f=fract(st);vec2 u=f*f*(3.0-2.0*f);return mix(mix(random(i),random(i+vec2(1.0,0.0)),u.x),mix(random(i+vec2(0.0,1.0)),random(i+vec2(1.0,1.0)),u.x),u.y);}bool insideBox(vec2 point,vec2 bottomLeft,vec2 topRight){return all(greaterThanEqual(point,bottomLeft))&&all(lessThan(point,topRight));}void main(){vec2 res=u_gridSize;float time=u_frameCount*0.006;vec2 texel=1.0/res;vec2 offset=vec2(0.0);vec2 fragCoord=vTexCoord*res;mediump vec4 rects[7];rects[0]=u_rect0;rects[1]=u_rect1;rects[2]=u_rect2;rects[3]=u_rect3;rects[4]=u_rect4;rects[5]=u_rect5;rects[6]=u_rect6;mediump int effects[7];effects[0]=u_effect0;effects[1]=u_effect1;effects[2]=u_effect2;effects[3]=u_effect3;effects[4]=u_effect4;effects[5]=u_effect5;effects[6]=u_effect6;bool inversions[7];inversions[0]=u_inverted0;inversions[1]=u_inverted1;inversions[2]=u_inverted2;inversions[3]=u_inverted3;inversions[4]=u_inverted4;inversions[5]=u_inverted5;inversions[6]=u_inverted6;int zoneIndex=-1;for(int i=0;i<7;i++){vec2 bl=rects[i].xy/res;vec2 tr=(rects[i].xy+rects[i].zw)/res;if(insideBox(vTexCoord,bl,tr)){zoneIndex=i;break;}}if(zoneIndex!=-1){int eff=effects[zoneIndex];vec2 center=rects[zoneIndex].xy+rects[zoneIndex].zw*0.5;float radius=length(rects[zoneIndex].zw*0.5);vec2 rel=(fragCoord-rects[zoneIndex].xy)/rects[zoneIndex].zw;if(eff==0)offset.y=-1.2*texel.y;else if(eff==1){if(mod(u_frameCount,30.0)<5.0)offset.x=floor(random(vec2(floor(time)))*30.0-15.0)*texel.x;}else if(eff==2){vec2 toC=fragCoord-center;if(radius>0.0)offset=normalize(toC)*texel*4.0;}else if(eff==3){vec2 nCoord=vTexCoord*10.0+time;offset=vec2(noise(nCoord)-0.5,noise(nCoord+15.0)-0.5)*texel*u_turbulence;}else if(eff==4)offset.x=(rel.y-0.5)*15.0*texel.x;else if(eff==5){vec2 d=fragCoord-center;offset=vec2(-d.y,d.x)*texel*0.1;}else if(eff==6){if(mod(floor(fragCoord.y),3.0)==0.0)offset.x=4.0*texel.x;}else if(eff==7)offset=vec2(random(vTexCoord+time)-0.5,random(vTexCoord-time)-0.5)*4.0*texel;else if(eff==8){vec3 mc=texture(u_previousPrimaryColor,vTexCoord).rgb;offset.x=(mc.r-0.5)*8.0*texel.x;offset.y=(mc.g-0.5)*8.0*texel.y;}else if(eff==9){vec2 toC=center-fragCoord;vec2 perp=vec2(-toC.y,toC.x);if(length(toC)>0.0)offset=normalize(toC*0.4+perp)*texel*2.0;}else if(eff==10)offset.y=sin(fragCoord.x*0.1+time*5.0)*4.0*texel.y;else if(eff==11){vec2 fromC=fragCoord-center;float dist=length(fromC);float angle=0.2*(radius-dist)/radius;mat2 R=mat2(cos(angle),-sin(angle),sin(angle),cos(angle));if(dist<radius)offset=(R*fromC-fromC)*5.0*texel;}else if(eff==12){float angle=noise(vTexCoord*12.0+time)*6.28;offset=vec2(cos(angle),sin(angle))*3.0*texel;}else if(eff==13){vec2 fromC=(fragCoord-center)/rects[zoneIndex].zw;float r2=dot(fromC,fromC);vec2 newP=center+fromC*(1.0+1.5*r2)*rects[zoneIndex].zw;offset=(newP-fragCoord)*0.2*texel;}else if(eff==14){vec2 fromC=fragCoord-center;offset=(fromC*0.02)*texel;}else if(eff==15){float size=4.0;vec2 p=floor(fragCoord/size)*size;offset=(p-fragCoord)*texel;}else if(eff==16){offset.x=sin(fragCoord.y*0.1+time*2.0)*4.0*texel.x;}else if(eff==17){offset=vec2(random(vTexCoord*time)-0.5)*2.0*texel;}else if(eff==18){offset.x=2.0*texel.x;}else if(eff==19){vec2 d=fragCoord-center;float angle=length(d)*0.05+time;offset=vec2(cos(angle),sin(angle))*2.0*texel;}else if(eff==20){vec2 d=fragCoord-center;float dist=length(d);if(dist<radius){float percent=dist/radius;offset=d*(pow(percent,2.0)-1.0)*0.5*texel;}}else if(eff==21){vec2 d=fragCoord-center;float dist=length(d);if(dist<radius){float percent=dist/radius;offset=-d*(pow(percent,2.0)-1.0)*0.5*texel;}}else if(eff==22){offset.x=(fragCoord.x-center.x)*0.1*texel.x;}else if(eff==23){offset.y=(fragCoord.y-center.y)*0.1*texel.y;}else if(eff==24){offset.y=sin(fragCoord.x*0.05+time*3.0)*5.0*texel.y;}else if(eff==25){float d=length(fragCoord-center);offset=normalize(fragCoord-center)*sin(d*0.1-time*5.0)*3.0*texel;}else if(eff==26){vec2 p=(fragCoord-center)/radius;float r=length(p);if(r<1.0){vec2 uv=p*pow(r,1.5);offset=(uv*radius+center-fragCoord)*texel;}}else if(eff==27){vec2 p=fragCoord-center;float a=atan(p.y,p.x);float r=length(p);a=mod(a,3.14159/3.0);offset=(vec2(cos(a),sin(a))*r+center-fragCoord)*texel;}else if(eff==28){if(fragCoord.x>center.x)offset.x=(center.x-fragCoord.x)*2.0*texel.x;}else if(eff==29){offset=vec2(sin(time),cos(time))*10.0*texel;}else if(eff==30){offset=vec2(sin(time*50.0),cos(time*40.0))*2.0*texel;}else if(eff==31){vec2 b=floor(fragCoord/20.0)*20.0;offset=vec2(random(b+time)-0.5)*10.0*texel;}else if(eff==32){offset.x=abs(mod(fragCoord.y*0.1+time*5.0,10.0)-5.0)*texel.x;}else if(eff==33){vec2 d=fragCoord-center;float r=length(d);float a=atan(d.y,d.x)+r*0.05+time;offset=(vec2(cos(a),sin(a))*r-d)*texel;}else if(eff==34){offset.y=-noise(vec2(fragCoord.x*0.1,time))*5.0*texel.y;}else if(eff==35){if(mod(floor(fragCoord.x),3.0)==0.0)offset.y=4.0*texel.y;}else if(eff==36){float n=random(vTexCoord+vec2(time*0.1));offset=vec2(step(0.5,n)*2.0-1.0)*texel*4.0;}else if(eff==37){vec4 r=texture(u_previousPrimaryColor,vTexCoord+vec2(texel.x,0.0));vec4 c=texture(u_previousPrimaryColor,vTexCoord);if(r.r>c.r)offset.x=texel.x;}else if(eff==38){vec4 r=texture(u_previousPrimaryColor,vTexCoord+vec2(texel.x,0.0));vec4 c=texture(u_previousPrimaryColor,vTexCoord);if(r.r<c.r)offset.x=-texel.x;}else if(eff==39){vec2 p=fract(vTexCoord*10.0);float d=length(p-vec2(0.5));offset=vec2(d)*texel*10.0;}else if(eff==40){vec2 uv=vTexCoord*2.0-vec2(1.0);offset=uv*dot(uv,uv)*0.05;}else if(eff==41){float tear=step(0.95,random(vec2(vTexCoord.y,time*0.01)));offset.x=tear*0.1;}else if(eff==42){float dir=step(0.5,mod(fragCoord.x+fragCoord.y,10.0)/10.0);offset=vec2(dir,1.0-dir)*texel*2.0;}else if(eff==43){vec2 d=vTexCoord-vec2(0.5);float l=length(d);offset=normalize(d)*sin(l*20.0-time*0.1)*texel*5.0;}else if(eff==44){offset=vec2(sin(vTexCoord.x*50.0+time*0.1),cos(vTexCoord.y*50.0+time*0.1))*texel;}else if(eff==45){vec2 d=vTexCoord-vec2(0.5);offset=d*length(d)*0.1;}else if(eff==46){vec2 d=vTexCoord-vec2(0.5);float zoom=1.0+0.5*sin(time*2.0);offset=d*(1.0/zoom-1.0)*texel*10.0;}else if(eff==48){float rnd=random(floor(fragCoord/25.0)+time);if(rnd<0.15){vec2 swellCenter=floor(fragCoord/25.0)*25.0+12.5;offset=(swellCenter-fragCoord)*texel;}}else if(eff==49){float blockSize=15.0;vec2 blockId=floor(fragCoord/blockSize);float rnd=random(blockId+floor(time*2.0));if(rnd<0.25){vec2 blockCenter=blockId*blockSize+(blockSize*0.5);offset=(blockCenter-fragCoord)*texel;}else{vec2 toEdge=normalize(fragCoord-(u_gridSize*0.5));float wriggle=sin(time*20.0+length(fragCoord)*0.1);vec2 perp=vec2(-toEdge.y,toEdge.x);vec2 moveDir=toEdge*4.0+perp*wriggle*3.0;offset=-moveDir*texel;}}if(inversions[zoneIndex])offset*=-1.0;}vec2 offPix=floor(offset*res+0.5);offPix=clamp(offPix,-1.0,1.0);fragColor=vec4((offPix.x+1.0)*0.5,(offPix.y+1.0)*0.5,0.0,1.0);}`;
-const PixelUpdateShader=`#version 300 es\nprecision mediump float;precision mediump int;in vec2 vTexCoord;uniform sampler2D u_shiftMap;uniform sampler2D u_previousPrimaryColor;uniform mediump vec2 u_gridSize;uniform mediump float u_seed;uniform mediump float u_frameCount;uniform mediump vec4 u_rect0,u_rect1,u_rect2,u_rect3,u_rect4,u_rect5,u_rect6;uniform mediump int u_effect0,u_effect1,u_effect2,u_effect3,u_effect4,u_effect5,u_effect6;uniform bool u_inverted0,u_inverted1,u_inverted2,u_inverted3,u_inverted4,u_inverted5,u_inverted6;out vec4 fragColor;float random(vec2 st){return fract(sin(dot(st.xy,vec2(12.9898,78.233))+u_seed)*43758.5453123);}bool insideBoxPixel(vec2 point,vec4 rect){return all(greaterThanEqual(point,rect.xy))&&all(lessThan(point,rect.xy+rect.zw));}vec2 getShift(ivec2 coord){vec4 shiftColor=texture(u_shiftMap,(vec2(coord)+0.5)/u_gridSize);return floor(shiftColor.xy*2.0-1.0+0.5);}void main(){vec2 res=u_gridSize;vec2 fragCoord=vTexCoord*res;ivec2 p=ivec2(fragCoord);mediump vec4 rects[7];rects[0]=u_rect0;rects[1]=u_rect1;rects[2]=u_rect2;rects[3]=u_rect3;rects[4]=u_rect4;rects[5]=u_rect5;rects[6]=u_rect6;mediump int effects[7];effects[0]=u_effect0;effects[1]=u_effect1;effects[2]=u_effect2;effects[3]=u_effect3;effects[4]=u_effect4;effects[5]=u_effect5;effects[6]=u_effect6;bool inversions[7];inversions[0]=u_inverted0;inversions[1]=u_inverted1;inversions[2]=u_inverted2;inversions[3]=u_inverted3;inversions[4]=u_inverted4;inversions[5]=u_inverted5;inversions[6]=u_inverted6;ivec2 sourceCoord=p+ivec2(getShift(p));int zoneIndex=-1;for(int i=0;i<7;i++){if(insideBoxPixel(fragCoord,rects[i])){zoneIndex=i;break;}}if(zoneIndex!=-1){int eff=effects[zoneIndex];if(eff==14){vec2 center=rects[zoneIndex].xy+rects[zoneIndex].zw*0.5;vec2 fromC=fragCoord-center;float scale=inversions[zoneIndex]?1.01:0.99;sourceCoord=ivec2(center+fromC*scale);}}vec2 sourceUV=(vec2(sourceCoord)+0.5)/res;vec4 pc=texture(u_previousPrimaryColor,sourceUV);if(zoneIndex!=-1){int eff=effects[zoneIndex];if(eff==47){pc.rgb=1.0-pc.rgb;}else if(eff==49){float lum=dot(pc.rgb,vec3(0.299,0.587,0.114));float noiseScale=random(fragCoord+u_frameCount*0.1);pc.rgb=vec3(step(0.4+noiseScale*0.2,lum));}}fragColor=pc;}`;
-const PostProcessShader=`#version 300 es\nprecision mediump float;precision mediump int;in vec2 vTexCoord;uniform sampler2D u_primaryColorIn;uniform vec2 u_gridSize;uniform float u_sharpenIntensity;out vec4 fragColor;void main(){vec2 texel=1.0/u_gridSize;vec4 center=texture(u_primaryColorIn,vTexCoord);vec4 top=texture(u_primaryColorIn,vTexCoord+vec2(0.0,-texel.y));vec4 bottom=texture(u_primaryColorIn,vTexCoord+vec2(0.0,texel.y));vec4 left=texture(u_primaryColorIn,vTexCoord+vec2(-texel.x,0.0));vec4 right=texture(u_primaryColorIn,vTexCoord+vec2(texel.x,0.0));vec4 sharpened=center*5.0-top-bottom-left-right;fragColor=clamp(mix(center,sharpened,u_sharpenIntensity),0.0,1.0);}`;
-class RectangleManager{constructor(gridCols,gridRows,splitDepth,spacing,maxRectangleCount){this.gridCols=gridCols;this.gridRows=gridRows;this.maxRectangleCount=maxRectangleCount;this.splitDepth=splitDepth;this.spacing=Math.max(0,Math.floor(spacing));this.rectangles=[];}initializeRectangles(){this.rectangles=[];const container={x:0,y:0,width:Math.floor(this.gridCols),height:Math.floor(this.gridRows)};this.splitSpace(container,0);if(this.rectangles.length>this.maxRectangleCount)this.rectangles.length=this.maxRectangleCount;while(this.rectangles.length<this.maxRectangleCount){this.rectangles.push({x:0,y:0,width:0,height:0,vx:0,vy:0,targetVx:0,targetVy:0});}}splitSpace(container,depth){if(depth>=this.splitDepth||this.rectangles.length>=this.maxRectangleCount){const vx=(eaRandom()-0.5)*CONFIG.movement.zoneSpeedMax;const vy=(eaRandom()-0.5)*CONFIG.movement.zoneSpeedMax;this.rectangles.push({...container,vx,vy,targetVx:vx,targetVy:vy});return;}const horiz=eaRandom()>0.5;if(horiz){if(container.height<this.spacing+2){this.rectangles.push({...container,vx:0,vy:0,targetVx:0,targetVy:0});return;}const sp=Math.floor(eaRandom()*(container.height-this.spacing-1))+1;this.splitSpace({x:container.x,y:container.y,width:container.width,height:sp},depth+1);this.splitSpace({x:container.x,y:container.y+sp+this.spacing,width:container.width,height:container.height-sp-this.spacing},depth+1);}else{if(container.width<this.spacing+2){this.rectangles.push({...container,vx:0,vy:0,targetVx:0,targetVy:0});return;}const sp=Math.floor(eaRandom()*(container.width-this.spacing-1))+1;this.splitSpace({x:container.x,y:container.y,width:sp,height:container.height},depth+1);this.splitSpace({x:container.x+sp+this.spacing,y:container.y,width:container.width-sp-this.spacing,height:container.height},depth+1);}}update(){this.rectangles.forEach(rect=>{if(rect.width===0)return;if(eaRandom()<CONFIG.movement.stutterChance){rect.x+=(eaRandom()-0.5)*CONFIG.movement.stutterMagnitude;rect.y+=(eaRandom()-0.5)*CONFIG.movement.stutterMagnitude;rect.targetVx=(eaRandom()-0.5)*CONFIG.movement.zoneSpeedMax*2.0;rect.targetVy=(eaRandom()-0.5)*CONFIG.movement.zoneSpeedMax*2.0;}rect.vx+=(rect.targetVx-rect.vx)*CONFIG.movement.easing;rect.vy+=(rect.targetVy-rect.vy)*CONFIG.movement.easing;rect.x+=rect.vx;rect.y+=rect.vy;if(rect.x<=0||rect.x+rect.width>=this.gridCols){rect.vx*=-1;rect.targetVx*=-1;}if(rect.y<=0||rect.y+rect.height>=this.gridRows){rect.vy*=-1;rect.targetVy*=-1;}rect.x=Math.max(0,Math.min(rect.x,this.gridCols-rect.width));rect.y=Math.max(0,Math.min(rect.y,this.gridRows-rect.height));});}}
-let shdInit,shdShift,shdPush,shdPost;let prevFbo,nextFbo,shiftFbo;let rectManager;let layer1Effects=[];let previewTriggered=false;let prevM0,prevM1,prevM2,prevM3,prevM4;
-function setup(){setAttributes('antialias',false);createCanvas(windowWidth,windowHeight,WEBGL);pixelDensity(1);noCursor();try{shdInit=createShader(vertShader,InitialPixelShader);shdShift=createShader(vertShader,PixelDisplacementShader);shdPush=createShader(vertShader,PixelUpdateShader);shdPost=createShader(vertShader,PostProcessShader);}catch(e){console.error(e.message);return;}prevFbo=createFramebuffer();nextFbo=createFramebuffer();shiftFbo=createFramebuffer();initArtwork();}
-function initArtwork(){updateConfigFromSliders();prevM0=m0;prevM1=m1;prevM2=m2;prevM3=m3;prevM4=m4;rectManager=new RectangleManager(width,height,CONFIG.simulation.splitDepth,0,CONFIG.simulation.numZones);rectManager.initializeRectangles();assignRandomEffects();prevFbo.begin();clear();shader(shdInit);shdInit.setUniform('u_gridSize',[width,height]);shdInit.setUniform('u_paletteSeed',m0);shdInit.setUniform('u_color0',CONFIG.palette[0]);shdInit.setUniform('u_color1',CONFIG.palette[1]);shdInit.setUniform('u_color2',CONFIG.palette[2]);shdInit.setUniform('u_color3',CONFIG.palette[3]);fullScreenQuad();prevFbo.end();nextFbo.begin();clear();shader(shdInit);shdInit.setUniform('u_gridSize',[width,height]);shdInit.setUniform('u_paletteSeed',m0);shdInit.setUniform('u_color0',CONFIG.palette[0]);shdInit.setUniform('u_color1',CONFIG.palette[1]);shdInit.setUniform('u_color2',CONFIG.palette[2]);shdInit.setUniform('u_color3',CONFIG.palette[3]);fullScreenQuad();nextFbo.end();}
-function fullScreenQuad(){beginShape(TRIANGLES);vertex(-1,-1,0,0,0);vertex(1,-1,0,1,0);vertex(-1,1,0,0,1);vertex(1,-1,0,1,0);vertex(1,1,0,1,1);vertex(-1,1,0,0,1);endShape();}
-function draw(){if(m0!==prevM0||m1!==prevM1||m2!==prevM2||m3!==prevM3||m4!==prevM4){initArtwork();}if(!shdPush)return;if(!previewTriggered&&frameCount>180&&typeof triggerPreview==='function'){triggerPreview();previewTriggered=true;}const currentTime=frameCount;layer1Effects.forEach((effect)=>{if(currentTime-effect.lastResetTime>effect.nextResetInterval){effect.id=CONFIG.activeEffects[Math.floor(eaRandom()*7)];effect.inverted=eaRandom()<0.5;effect.lastResetTime=currentTime;effect.nextResetInterval=CONFIG.simulation.effectChangeMin+eaRandom()*(CONFIG.simulation.effectChangeMax-CONFIG.simulation.effectChangeMin);}});rectManager.update();shiftFbo.begin();clear();shader(shdShift);shdShift.setUniform('u_frameCount',frameCount);shdShift.setUniform('u_gridSize',[width,height]);shdShift.setUniform('u_seed',CONFIG.shaderSeed);shdShift.setUniform('u_turbulence',CONFIG.effects.turbulenceMag);shdShift.setUniform('u_previousPrimaryColor',prevFbo);for(let i=0;i<CONFIG.simulation.numZones;i++){let r=rectManager.rectangles[i];if(r)shdShift.setUniform(`u_rect${i}`,[r.x,r.y,r.width,r.height]);let eff=layer1Effects[i];if(eff){shdShift.setUniform(`u_effect${i}`,eff.id);shdShift.setUniform(`u_inverted${i}`,eff.inverted);}}fullScreenQuad();shiftFbo.end();nextFbo.begin();clear();shader(shdPush);shdPush.setUniform('u_frameCount',frameCount);shdPush.setUniform('u_gridSize',[width,height]);shdPush.setUniform('u_seed',CONFIG.shaderSeed);shdPush.setUniform('u_shiftMap',shiftFbo);shdPush.setUniform('u_previousPrimaryColor',prevFbo);for(let i=0;i<CONFIG.simulation.numZones;i++){let r=rectManager.rectangles[i];if(r)shdPush.setUniform(`u_rect${i}`,[r.x,r.y,r.width,r.height]);let eff=layer1Effects[i];if(eff){shdPush.setUniform(`u_effect${i}`,eff.id);shdPush.setUniform(`u_inverted${i}`,eff.inverted);}}fullScreenQuad();nextFbo.end();let temp=prevFbo;prevFbo=nextFbo;nextFbo=temp;clear();shader(shdPost);shdPost.setUniform('u_primaryColorIn',nextFbo);shdPost.setUniform('u_gridSize',[width,height]);shdPost.setUniform('u_sharpenIntensity',CONFIG.effects.sharpenIntensity);fullScreenQuad();}
-function windowResized(){resizeCanvas(windowWidth,windowHeight);prevFbo.resize(width,height);nextFbo.resize(width,height);shiftFbo.resize(width,height);initArtwork();}
-function assignRandomEffects(){layer1Effects=[];const now=frameCount||0;for(let i=0;i<CONFIG.simulation.numZones;i++){layer1Effects.push({id:CONFIG.activeEffects[Math.floor(eaRandom()*7)],inverted:eaRandom()<0.5,lastResetTime:now,nextResetInterval:CONFIG.simulation.effectChangeMin+eaRandom()*(CONFIG.simulation.effectChangeMax-CONFIG.simulation.effectChangeMin)});}}
+        // ==========================================================
+        // 2. DETERMINISTIC PRNG (Pseudo-Random Number Generator)
+        // ==========================================================
+        // Generative art platforms require deterministic randomness.
+        // We replace Math.random() with a seeded generator so that the 
+        // same combination of sliders always produces the exact same result.
+        let masterSeed = 0;
+        function eaRandom() {
+            var t = masterSeed += 0x6D2B79F5;
+            t = Math.imul(t ^ t >>> 15, t | 1);
+            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+        }
+
+        // ==========================================================
+        // 3. COLOR GENERATION UTILITY
+        // ==========================================================
+        // Converts HSL values to RGB arrays for WebGL shaders.
+        // Includes an HDR (High Dynamic Range) multiplier to push colors 
+        // past 1.0, creating bright, blown-out neon effects when blending.
+        function hslToRgb(h, s, l, hdrMultiplier = 1.0) {
+            let r, g, b;
+            if (s === 0) {
+                r = g = b = l; 
+            } else {
+                const hue2rgb = (p, q, t) => {
+                    if (t < 0) t += 1;
+                    if (t > 1) t -= 1;
+                    if (t < 1/6) return p + (q - p) * 6 * t;
+                    if (t < 1/2) return q;
+                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+                    return p;
+                };
+                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                const p = 2 * l - q;
+                r = hue2rgb(p, q, h + 1/3);
+                g = hue2rgb(p, q, h);
+                b = hue2rgb(p, q, h - 1/3);
+            }
+            return [r * hdrMultiplier, g * hdrMultiplier, b * hdrMultiplier];
+        }
+
+        // ==========================================================
+        // 4. GLOBAL ENGINE CONFIGURATION
+        // ==========================================================
+        let CONFIG = {};
+
+        function updateConfigFromSliders() {
+            // Seed the PRNG using a mathematical mix of all 5 sliders
+            masterSeed = Math.floor((m0 + m1 * 10 + m2 * 100 + m3 * 1000 + m4 * 10000) * 1234567);
+            
+            let hdr = 1.2 + (eaRandom() * 0.8); // Randomize Neon intensity
+            
+            // Calculate a mathematically contrasting color palette
+            let baseHue = eaRandom();
+            let compHue = (baseHue + 0.5) % 1.0; 
+            let splitHue1 = (baseHue + 0.25 + eaRandom() * 0.1) % 1.0;
+            let splitHue2 = (baseHue + 0.75 - eaRandom() * 0.1) % 1.0;
+            
+            let palette = [
+                hslToRgb(baseHue, 0.8 + eaRandom() * 0.2, 0.1 + eaRandom() * 0.1, 1.0), // Dark anchor
+                hslToRgb(compHue, 0.9 + eaRandom() * 0.1, 0.4 + eaRandom() * 0.1, hdr), // Complementary
+                hslToRgb(splitHue1, 0.8 + eaRandom() * 0.2, 0.5 + eaRandom() * 0.1, hdr), // Accent 1
+                hslToRgb(splitHue2, 0.9 + eaRandom() * 0.1, 0.6 + eaRandom() * 0.1, hdr * 1.2) // Highlight
+            ];
+
+            // Select 7 specific visual effects from the pool of 50
+            let allEffects = Array.from({length: 50}, (_, i) => i);
+            for (let i = allEffects.length - 1; i > 0; i--) {
+                const j = Math.floor(eaRandom() * (i + 1));
+                [allEffects[i], allEffects[j]] = [allEffects[j], allEffects[i]];
+            }
+            let activeEffects = allEffects.slice(0, 7);
+            
+            // Populate the master configuration object
+            CONFIG = {
+                palette: palette,
+                activeEffects: activeEffects,
+                simulation: {
+                    numZones: 7, 
+                    splitDepth: Math.floor(1 + m2 * 4), // Mapped to m2 slider
+                    effectChangeMin: Math.floor(30 + m1 * 60),
+                    effectChangeMax: Math.floor(120 + m1 * 240),
+                },
+                movement: {
+                    zoneSpeedMax: 2.0 + m1 * 6.0,
+                    easing: 0.05,
+                    stutterChance: 0.05,
+                    stutterMagnitude: 30.0
+                },
+                effects: {
+                    turbulenceMag: 2.0 + (m1 * 8.0),
+                    sharpenIntensity: m3 * 1.5 
+                },
+                shaderSeed: eaRandom() * 1000.0 
+            };
+
+            // Register Traits for the NFT Marketplace
+            window.editartFeatures = {
+                "Complexity": CONFIG.simulation.splitDepth.toString(),
+                "Fluid Speed": m1 > 0.7 ? "Fast" : m1 > 0.3 ? "Moderate" : "Slow",
+                "Aesthetic Style": m3 > 0.6 ? "Hard Edges" : "Soft Liquid",
+                "Primary Hue": Math.floor(baseHue * 360) + " Degrees"
+            };
+        }
+
+        // ==========================================================
+        // 5. GLSL SHADERS (WEBGL 2.0)
+        // ==========================================================
+        // Standard passthrough vertex shader
+        const vertShader = `#version 300 es
+            in vec3 aPosition;
+            in vec2 aTexCoord;
+            out vec2 vTexCoord;
+            void main() {
+                vTexCoord = aTexCoord;
+                gl_Position = vec4(aPosition, 1.0);
+            }`;
+
+        // Generates the very first frame of the artwork (gradients, grids, splits)
+        const InitialPixelShader = `#version 300 es
+            precision mediump float;
+            uniform vec2 u_gridSize;
+            uniform float u_paletteSeed;
+            uniform vec3 u_color0;
+            uniform vec3 u_color1;
+            uniform vec3 u_color2;
+            uniform vec3 u_color3;
+            in vec2 vTexCoord;
+            out vec4 fragColor;
+            
+            void main() {
+                vec2 uv = vTexCoord;
+                vec3 color = vec3(0.0);
+                
+                // Determine layout based on slider m0
+                if(u_paletteSeed < 0.33) {
+                    color = uv.x < 0.5 ? u_color0 : u_color1;
+                } else if(u_paletteSeed < 0.66) {
+                    vec3 topMix = mix(u_color0, u_color2, uv.x);
+                    vec3 botMix = mix(u_color1, u_color3, uv.x);
+                    color = mix(topMix, botMix, uv.y);
+                } else {
+                    if(uv.x < 0.5 && uv.y < 0.5) color = u_color0;
+                    else if(uv.x >= 0.5 && uv.y < 0.5) color = u_color1;
+                    else if(uv.x < 0.5 && uv.y >= 0.5) color = u_color2;
+                    else color = u_color3;
+                }
+                fragColor = vec4(color, 1.0);
+            }`;
+
+        // Calculates how far every pixel should move this frame based on math/physics
+        const PixelDisplacementShader = `#version 300 es
+            precision mediump float;
+            precision mediump int;
+            in vec2 vTexCoord;
+            uniform mediump float u_frameCount;
+            uniform mediump float u_seed;
+            uniform mediump vec2 u_gridSize;
+            uniform mediump vec4 u_rect0, u_rect1, u_rect2, u_rect3, u_rect4, u_rect5, u_rect6;
+            uniform mediump int u_effect0, u_effect1, u_effect2, u_effect3, u_effect4, u_effect5, u_effect6;
+            uniform bool u_inverted0, u_inverted1, u_inverted2, u_inverted3, u_inverted4, u_inverted5, u_inverted6;
+            uniform sampler2D u_previousPrimaryColor;
+            uniform float u_turbulence;
+            out vec4 fragColor;
+            
+            float random(vec2 st) { return fract(sin(dot(st.xy, vec2(12.9898,78.233)) + u_seed) * 43758.5453123); }
+            float noise(vec2 st) {
+                vec2 i = floor(st); vec2 f = fract(st); vec2 u = f*f*(3.0-2.0*f);
+                return mix(mix(random(i), random(i + vec2(1.0, 0.0)), u.x),
+                           mix(random(i + vec2(0.0, 1.0)), random(i + vec2(1.0, 1.0)), u.x), u.y);
+            }
+            bool insideBox(vec2 point, vec2 bottomLeft, vec2 topRight) { 
+                return all(greaterThanEqual(point, bottomLeft)) && all(lessThan(point, topRight)); 
+            }
+            
+            void main() {
+                vec2 res = u_gridSize;
+                float time = u_frameCount * 0.006;
+                vec2 texel = 1.0 / res;
+                vec2 offset = vec2(0.0);
+                vec2 fragCoord = vTexCoord * res;
+                
+                // Unpack uniforms into arrays for iteration
+                mediump vec4 rects[7] = vec4[](u_rect0, u_rect1, u_rect2, u_rect3, u_rect4, u_rect5, u_rect6);
+                mediump int effects[7] = int[](u_effect0, u_effect1, u_effect2, u_effect3, u_effect4, u_effect5, u_effect6);
+                bool inversions[7] = bool[](u_inverted0, u_inverted1, u_inverted2, u_inverted3, u_inverted4, u_inverted5, u_inverted6);
+                
+                int zoneIndex = -1;
+                for(int i = 0; i < 7; i++) {
+                    vec2 bl = rects[i].xy / res;
+                    vec2 tr = (rects[i].xy + rects[i].zw) / res;
+                    if (insideBox(vTexCoord, bl, tr)) { zoneIndex = i; break; }
+                }
+                
+                // The master list of 50 fluid/math effects
+                if (zoneIndex != -1) {
+                    int eff = effects[zoneIndex];
+                    vec2 center = rects[zoneIndex].xy + rects[zoneIndex].zw * 0.5;
+                    float radius = length(rects[zoneIndex].zw * 0.5);
+                    vec2 rel = (fragCoord - rects[zoneIndex].xy) / rects[zoneIndex].zw;
+                    
+                    if (eff == 0) offset.y = -1.2 * texel.y;
+                    else if (eff == 1) { if (mod(u_frameCount, 30.0) < 5.0) offset.x = floor(random(vec2(floor(time)))*30.0-15.0) * texel.x; }
+                    else if (eff == 2) { vec2 toC = fragCoord - center; if(radius>0.0) offset = normalize(toC) * texel * 4.0; }
+                    else if (eff == 3) { vec2 nCoord = vTexCoord * 10.0 + time; offset = vec2(noise(nCoord)-0.5, noise(nCoord+15.0)-0.5)*texel*u_turbulence; }
+                    else if (eff == 4) offset.x = (rel.y - 0.5) * 15.0 * texel.x;
+                    else if (eff == 5) { vec2 d = fragCoord-center; offset = vec2(-d.y, d.x)*texel*0.1; }
+                    else if (eff == 6) { if (mod(floor(fragCoord.y), 3.0) == 0.0) offset.x = 4.0 * texel.x; }
+                    else if (eff == 7) offset = vec2(random(vTexCoord+time)-0.5, random(vTexCoord-time)-0.5)*4.0*texel;
+                    else if (eff == 8) { vec3 mc = texture(u_previousPrimaryColor, vTexCoord).rgb; offset.x = (mc.r - 0.5) * 8.0 * texel.x; offset.y = (mc.g - 0.5) * 8.0 * texel.y; }
+                    else if (eff == 9) { vec2 toC = center - fragCoord; vec2 perp = vec2(-toC.y, toC.x); if(length(toC)>0.0) offset = normalize(toC * 0.4 + perp) * texel * 2.0; }
+                    else if (eff == 10) offset.y = sin(fragCoord.x * 0.1 + time * 5.0) * 4.0 * texel.y;
+                    else if (eff == 11) { vec2 fromC = fragCoord - center; float dist = length(fromC); float angle = 0.2 * (radius - dist) / radius; mat2 R = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)); if(dist < radius) offset = (R * fromC - fromC) * 5.0 * texel; }
+                    else if (eff == 12) { float angle = noise(vTexCoord * 12.0 + time) * 6.28; offset = vec2(cos(angle), sin(angle)) * 3.0 * texel; }
+                    else if (eff == 13) { vec2 fromC = (fragCoord - center) / rects[zoneIndex].zw; float r2 = dot(fromC, fromC); vec2 newP = center + fromC * (1.0 + 1.5 * r2) * rects[zoneIndex].zw; offset = (newP - fragCoord) * 0.2 * texel; }
+                    else if (eff == 14) { vec2 fromC = fragCoord - center; offset = (fromC * 0.02) * texel; }
+                    else if (eff == 15) { float size = 4.0; vec2 p = floor(fragCoord / size) * size; offset = (p - fragCoord) * texel; }
+                    else if (eff == 16) { offset.x = sin(fragCoord.y * 0.1 + time * 2.0) * 4.0 * texel.x; }
+                    else if (eff == 17) { offset = vec2(random(vTexCoord * time) - 0.5) * 2.0 * texel; }
+                    else if (eff == 18) { offset.x = 2.0 * texel.x; }
+                    else if (eff == 19) { vec2 d = fragCoord - center; float angle = length(d) * 0.05 + time; offset = vec2(cos(angle), sin(angle)) * 2.0 * texel; }
+                    else if (eff == 20) { vec2 d = fragCoord - center; float dist = length(d); if (dist < radius) { float percent = dist / radius; offset = d * (pow(percent, 2.0) - 1.0) * 0.5 * texel; } }
+                    else if (eff == 21) { vec2 d = fragCoord - center; float dist = length(d); if (dist < radius) { float percent = dist / radius; offset = -d * (pow(percent, 2.0) - 1.0) * 0.5 * texel; } }
+                    else if (eff == 22) { offset.x = (fragCoord.x - center.x) * 0.1 * texel.x; }
+                    else if (eff == 23) { offset.y = (fragCoord.y - center.y) * 0.1 * texel.y; }
+                    else if (eff == 24) { offset.y = sin(fragCoord.x * 0.05 + time * 3.0) * 5.0 * texel.y; }
+                    else if (eff == 25) { float d = length(fragCoord - center); offset = normalize(fragCoord - center) * sin(d * 0.1 - time * 5.0) * 3.0 * texel; }
+                    else if (eff == 26) { vec2 p = (fragCoord - center) / radius; float r = length(p); if (r < 1.0) { vec2 uv = p * pow(r, 1.5); offset = (uv * radius + center - fragCoord) * texel; } }
+                    else if (eff == 27) { vec2 p = fragCoord - center; float a = atan(p.y, p.x); float r = length(p); a = mod(a, 3.14159 / 3.0); offset = (vec2(cos(a), sin(a)) * r + center - fragCoord) * texel; }
+                    else if (eff == 28) { if (fragCoord.x > center.x) offset.x = (center.x - fragCoord.x) * 2.0 * texel.x; }
+                    else if (eff == 29) { offset = vec2(sin(time), cos(time)) * 10.0 * texel; }
+                    else if (eff == 30) { offset = vec2(sin(time * 50.0), cos(time * 40.0)) * 2.0 * texel; }
+                    else if (eff == 31) { vec2 b = floor(fragCoord / 20.0) * 20.0; offset = vec2(random(b + time) - 0.5) * 10.0 * texel; }
+                    else if (eff == 32) { offset.x = abs(mod(fragCoord.y * 0.1 + time * 5.0, 10.0) - 5.0) * texel.x; }
+                    else if (eff == 33) { vec2 d = fragCoord - center; float r = length(d); float a = atan(d.y, d.x) + r * 0.05 + time; offset = (vec2(cos(a), sin(a)) * r - d) * texel; }
+                    else if (eff == 34) { offset.y = -noise(vec2(fragCoord.x * 0.1, time)) * 5.0 * texel.y; }
+                    else if (eff == 35) { if (mod(floor(fragCoord.x), 3.0) == 0.0) offset.y = 4.0 * texel.y; }
+                    else if (eff == 36) { float n = random(vTexCoord + vec2(time * 0.1)); offset = vec2(step(0.5, n) * 2.0 - 1.0) * texel * 4.0; }
+                    else if (eff == 37) { vec4 r = texture(u_previousPrimaryColor, vTexCoord + vec2(texel.x, 0.0)); vec4 c = texture(u_previousPrimaryColor, vTexCoord); if (r.r > c.r) offset.x = texel.x; }
+                    else if (eff == 38) { vec4 r = texture(u_previousPrimaryColor, vTexCoord + vec2(texel.x, 0.0)); vec4 c = texture(u_previousPrimaryColor, vTexCoord); if (r.r < c.r) offset.x = -texel.x; }
+                    else if (eff == 39) { vec2 p = fract(vTexCoord * 10.0); float d = length(p - vec2(0.5)); offset = vec2(d) * texel * 10.0; }
+                    else if (eff == 40) { vec2 uv = vTexCoord * 2.0 - vec2(1.0); offset = uv * dot(uv, uv) * 0.05; }
+                    else if (eff == 41) { float tear = step(0.95, random(vec2(vTexCoord.y, time * 0.01))); offset.x = tear * 0.1; }
+                    else if (eff == 42) { float dir = step(0.5, mod(fragCoord.x + fragCoord.y, 10.0) / 10.0); offset = vec2(dir, 1.0-dir) * texel * 2.0; }
+                    else if (eff == 43) { vec2 d = vTexCoord - vec2(0.5); float l = length(d); offset = normalize(d) * sin(l * 20.0 - time * 0.1) * texel * 5.0; }
+                    else if (eff == 44) { offset = vec2(sin(vTexCoord.x * 50.0 + time * 0.1), cos(vTexCoord.y * 50.0 + time * 0.1)) * texel; }
+                    else if (eff == 45) { vec2 d = vTexCoord - vec2(0.5); offset = d * length(d) * 0.1; }
+                    else if (eff == 46) { vec2 d = vTexCoord - vec2(0.5); float zoom = 1.0 + 0.5 * sin(time * 2.0); offset = d * (1.0/zoom - 1.0) * texel * 10.0; }
+                    else if (eff == 48) { float rnd = random(floor(fragCoord / 25.0) + time); if (rnd < 0.15) { vec2 swellCenter = floor(fragCoord / 25.0) * 25.0 + 12.5; offset = (swellCenter - fragCoord) * texel; } }
+                    else if (eff == 49) { 
+                        float blockSize = 15.0; vec2 blockId = floor(fragCoord / blockSize); float rnd = random(blockId + floor(time * 2.0)); 
+                        if(rnd < 0.25) { vec2 blockCenter = blockId * blockSize + (blockSize * 0.5); offset = (blockCenter - fragCoord) * texel; }
+                        else { vec2 toEdge = normalize(fragCoord - (u_gridSize * 0.5)); float wriggle = sin(time * 20.0 + length(fragCoord) * 0.1); vec2 perp = vec2(-toEdge.y, toEdge.x); vec2 moveDir = toEdge * 4.0 + perp * wriggle * 3.0; offset = -moveDir * texel; }
+                    }
+                    
+                    if (inversions[zoneIndex]) offset *= -1.0;
+                }
+                
+                // Pack displacement vectors into color channels
+                vec2 offPix = floor(offset * res + 0.5);
+                offPix = clamp(offPix, -1.0, 1.0);
+                fragColor = vec4((offPix.x + 1.0) * 0.5, (offPix.y + 1.0) * 0.5, 0.0, 1.0);
+            }`;
+
+        // Uses the offset map generated above to physically push colors around the canvas
+        const PixelUpdateShader = `#version 300 es
+            precision mediump float;
+            precision mediump int;
+            in vec2 vTexCoord;
+            uniform sampler2D u_shiftMap;
+            uniform sampler2D u_previousPrimaryColor;
+            uniform mediump vec2 u_gridSize;
+            uniform mediump float u_seed;
+            uniform mediump float u_frameCount;
+            uniform mediump vec4 u_rect0, u_rect1, u_rect2, u_rect3, u_rect4, u_rect5, u_rect6;
+            uniform mediump int u_effect0, u_effect1, u_effect2, u_effect3, u_effect4, u_effect5, u_effect6;
+            uniform bool u_inverted0, u_inverted1, u_inverted2, u_inverted3, u_inverted4, u_inverted5, u_inverted6;
+            out vec4 fragColor;
+            
+            float random(vec2 st) { return fract(sin(dot(st.xy, vec2(12.9898,78.233)) + u_seed) * 43758.5453123); }
+            bool insideBoxPixel(vec2 point, vec4 rect) { return all(greaterThanEqual(point, rect.xy)) && all(lessThan(point, rect.xy + rect.zw)); }
+            
+            vec2 getShift(ivec2 coord) {
+                vec4 shiftColor = texture(u_shiftMap, (vec2(coord) + 0.5) / u_gridSize);
+                return floor(shiftColor.xy * 2.0 - 1.0 + 0.5);
+            }
+            
+            void main() {
+                vec2 res = u_gridSize;
+                vec2 fragCoord = vTexCoord * res;
+                ivec2 p = ivec2(fragCoord);
+                
+                mediump vec4 rects[7] = vec4[](u_rect0, u_rect1, u_rect2, u_rect3, u_rect4, u_rect5, u_rect6);
+                mediump int effects[7] = int[](u_effect0, u_effect1, u_effect2, u_effect3, u_effect4, u_effect5, u_effect6);
+                bool inversions[7] = bool[](u_inverted0, u_inverted1, u_inverted2, u_inverted3, u_inverted4, u_inverted5, u_inverted6);
+                
+                ivec2 sourceCoord = p + ivec2(getShift(p));
+                int zoneIndex = -1;
+                
+                for(int i = 0; i < 7; i++) {
+                    if (insideBoxPixel(fragCoord, rects[i])) { zoneIndex = i; break; }
+                }
+                
+                if (zoneIndex != -1 && effects[zoneIndex] == 14) {
+                    vec2 center = rects[zoneIndex].xy + rects[zoneIndex].zw * 0.5;
+                    vec2 fromC = fragCoord - center;
+                    float scale = inversions[zoneIndex] ? 1.01 : 0.99;
+                    sourceCoord = ivec2(center + fromC * scale);
+                }
+                
+                vec2 sourceUV = (vec2(sourceCoord) + 0.5) / res;
+                vec4 pc = texture(u_previousPrimaryColor, sourceUV);
+                
+                // Direct color manipulation effects
+                if (zoneIndex != -1) {
+                    int eff = effects[zoneIndex];
+                    if (eff == 47) { pc.rgb = 1.0 - pc.rgb; } // Invert colors
+                    else if (eff == 49) { 
+                        float lum = dot(pc.rgb, vec3(0.299, 0.587, 0.114));
+                        float noiseScale = random(fragCoord + u_frameCount * 0.1);
+                        pc.rgb = vec3(step(0.4 + noiseScale * 0.2, lum));
+                    }
+                }
+                fragColor = pc;
+            }`;
+
+        // Final pass before rendering to screen (handles sharpening)
+        const PostProcessShader = `#version 300 es
+            precision mediump float;
+            precision mediump int;
+            in vec2 vTexCoord;
+            uniform sampler2D u_primaryColorIn;
+            uniform vec2 u_gridSize;
+            uniform float u_sharpenIntensity;
+            out vec4 fragColor;
+            
+            void main() {
+                vec2 texel = 1.0 / u_gridSize;
+                vec4 center = texture(u_primaryColorIn, vTexCoord);
+                vec4 top    = texture(u_primaryColorIn, vTexCoord + vec2(0.0, -texel.y));
+                vec4 bottom = texture(u_primaryColorIn, vTexCoord + vec2(0.0, texel.y));
+                vec4 left   = texture(u_primaryColorIn, vTexCoord + vec2(-texel.x, 0.0));
+                vec4 right  = texture(u_primaryColorIn, vTexCoord + vec2(texel.x, 0.0));
+                
+                // Laplacian edge sharpening convolution
+                vec4 sharpened = center * 5.0 - top - bottom - left - right;
+                fragColor = clamp(mix(center, sharpened, u_sharpenIntensity), 0.0, 1.0);
+            }`;
+
+        // ==========================================================
+        // 6. RECTANGLE / ZONE MANAGER
+        // ==========================================================
+        // Manages the physics, size, and bouncing of the unseen 
+        // bounding boxes that contain the different physics effects.
+        class RectangleManager {
+            constructor(gridCols, gridRows, splitDepth, spacing, maxRectangleCount) {
+                this.gridCols = gridCols;
+                this.gridRows = gridRows;
+                this.maxRectangleCount = maxRectangleCount;
+                this.splitDepth = splitDepth;
+                this.spacing = Math.max(0, Math.floor(spacing));
+                this.rectangles = [];
+            }
+
+            // Initializes rectangles using a recursive spatial split
+            initializeRectangles() {
+                this.rectangles = [];
+                const container = { x: 0, y: 0, width: Math.floor(this.gridCols), height: Math.floor(this.gridRows) };
+                this.splitSpace(container, 0);
+                if (this.rectangles.length > this.maxRectangleCount) this.rectangles.length = this.maxRectangleCount;
+                
+                // Pad with empty rectangles if we didn't hit our max depth
+                while (this.rectangles.length < this.maxRectangleCount) {
+                    this.rectangles.push({ x: 0, y: 0, width: 0, height: 0, vx: 0, vy: 0, targetVx: 0, targetVy: 0 });
+                }
+            }
+
+            // Recursively chops the screen into smaller zones
+            splitSpace(container, depth) {
+                if (depth >= this.splitDepth || this.rectangles.length >= this.maxRectangleCount) {
+                    const vx = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax;
+                    const vy = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax;
+                    this.rectangles.push({ ...container, vx, vy, targetVx: vx, targetVy: vy });
+                    return;
+                }
+                const horiz = eaRandom() > 0.5;
+                if (horiz) {
+                    if (container.height < this.spacing + 2) {
+                        this.rectangles.push({ ...container, vx: 0, vy: 0, targetVx: 0, targetVy: 0 });
+                        return;
+                    }
+                    const sp = Math.floor(eaRandom() * (container.height - this.spacing - 1)) + 1;
+                    this.splitSpace({ x: container.x, y: container.y, width: container.width, height: sp }, depth + 1);
+                    this.splitSpace({ x: container.x, y: container.y + sp + this.spacing, width: container.width, height: container.height - sp - this.spacing }, depth + 1);
+                } else {
+                    if (container.width < this.spacing + 2) {
+                        this.rectangles.push({ ...container, vx: 0, vy: 0, targetVx: 0, targetVy: 0 });
+                        return;
+                    }
+                    const sp = Math.floor(eaRandom() * (container.width - this.spacing - 1)) + 1;
+                    this.splitSpace({ x: container.x, y: container.y, width: sp, height: container.height }, depth + 1);
+                    this.splitSpace({ x: container.x + sp + this.spacing, y: container.y, width: container.width - sp - this.spacing, height: container.height }, depth + 1);
+                }
+            }
+
+            // Updates zone movement vectors and handles screen-edge bouncing
+            update() {
+                this.rectangles.forEach(rect => {
+                    if (rect.width === 0) return;
+                    
+                    if (eaRandom() < CONFIG.movement.stutterChance) {
+                        rect.x += (eaRandom() - 0.5) * CONFIG.movement.stutterMagnitude;
+                        rect.y += (eaRandom() - 0.5) * CONFIG.movement.stutterMagnitude;
+                        rect.targetVx = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax * 2.0;
+                        rect.targetVy = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax * 2.0;
+                    }
+                    
+                    rect.vx += (rect.targetVx - rect.vx) * CONFIG.movement.easing;
+                    rect.vy += (rect.targetVy - rect.vy) * CONFIG.movement.easing;
+                    rect.x += rect.vx;
+                    rect.y += rect.vy;
+                    
+                    // Bounce off edges
+                    if (rect.x <= 0 || rect.x + rect.width >= this.gridCols) {
+                        rect.vx *= -1; rect.targetVx *= -1;
+                    }
+                    if (rect.y <= 0 || rect.y + rect.height >= this.gridRows) {
+                        rect.vy *= -1; rect.targetVy *= -1;
+                    }
+                    
+                    // Clamp inside bounds
+                    rect.x = Math.max(0, Math.min(rect.x, this.gridCols - rect.width));
+                    rect.y = Math.max(0, Math.min(rect.y, this.gridRows - rect.height));
+                });
+            }
+        }
+
+        // ==========================================================
+        // 7. MAIN P5.JS LIFECYCLE
+        // ==========================================================
+        let shdInit, shdShift, shdPush, shdPost;
+        let prevFbo, nextFbo, shiftFbo;
+        let rectManager;
+        let layer1Effects = [];
+        let previewTriggered = false;
+        let prevM0, prevM1, prevM2, prevM3, prevM4;
+
+        function setup() {
+            setAttributes('antialias', false); // Hard pixel edges
+            createCanvas(windowWidth, windowHeight, WEBGL);
+            pixelDensity(1); 
+            noCursor(); // Hide mouse
+
+            // Compile shaders
+            try {
+                shdInit  = createShader(vertShader, InitialPixelShader);
+                shdShift = createShader(vertShader, PixelDisplacementShader);
+                shdPush  = createShader(vertShader, PixelUpdateShader);
+                shdPost  = createShader(vertShader, PostProcessShader);
+            } catch (e) {
+                console.error("Shader failed to compile: " + e.message);
+                return;
+            }
+
+            // Create WebGL 2.0 Framebuffers for ping-pong feedback loop
+            prevFbo  = createFramebuffer();
+            nextFbo  = createFramebuffer();
+            shiftFbo = createFramebuffer();
+
+            initArtwork();
+        }
+
+        // Bootstraps or resets the artwork if sliders change
+        function initArtwork() {
+            updateConfigFromSliders();
+
+            // Track state for changes
+            prevM0 = m0; prevM1 = m1; prevM2 = m2; prevM3 = m3; prevM4 = m4;
+            
+            rectManager = new RectangleManager(width, height, CONFIG.simulation.splitDepth, 0, CONFIG.simulation.numZones);
+            rectManager.initializeRectangles();
+            assignRandomEffects();
+
+            // Render the initial color layouts to the buffers
+            prevFbo.begin();
+            clear();
+            shader(shdInit);
+            shdInit.setUniform('u_gridSize', [width, height]);
+            shdInit.setUniform('u_paletteSeed', m0);
+            shdInit.setUniform('u_color0', CONFIG.palette[0]);
+            shdInit.setUniform('u_color1', CONFIG.palette[1]);
+            shdInit.setUniform('u_color2', CONFIG.palette[2]);
+            shdInit.setUniform('u_color3', CONFIG.palette[3]);
+            fullScreenQuad();
+            prevFbo.end();
+
+            nextFbo.begin();
+            clear();
+            shader(shdInit);
+            shdInit.setUniform('u_gridSize', [width, height]);
+            shdInit.setUniform('u_paletteSeed', m0);
+            shdInit.setUniform('u_color0', CONFIG.palette[0]);
+            shdInit.setUniform('u_color1', CONFIG.palette[1]);
+            shdInit.setUniform('u_color2', CONFIG.palette[2]);
+            shdInit.setUniform('u_color3', CONFIG.palette[3]);
+            fullScreenQuad();
+            nextFbo.end();
+        }
+
+        // Helper to draw a full-canvas quad for shader application
+        function fullScreenQuad() {
+            beginShape(TRIANGLES);
+            vertex(-1, -1, 0, 0, 0); vertex(1, -1, 0, 1, 0); vertex(-1, 1, 0, 0, 1);
+            vertex(1, -1, 0, 1, 0);  vertex(1, 1, 0, 1, 1);  vertex(-1, 1, 0, 0, 1);
+            endShape();
+        }
+
+        function draw() {
+            // Hot-reload logic for sliders
+            if (m0 !== prevM0 || m1 !== prevM1 || m2 !== prevM2 || m3 !== prevM3 || m4 !== prevM4) {
+                initArtwork();
+            }
+
+            if (!shdPush) return; 
+
+            // Trigger preview for marketplace thumbnail after 180 frames (roughly 3 seconds)
+            if (!previewTriggered && frameCount > 180 && typeof triggerPreview === 'function') {
+                triggerPreview();
+                previewTriggered = true;
+            }
+
+            const currentTime = frameCount;
+
+            // Manage time-based effect rotations randomly
+            layer1Effects.forEach((effect) => {
+                if (currentTime - effect.lastResetTime > effect.nextResetInterval) {
+                    effect.id = CONFIG.activeEffects[Math.floor(eaRandom() * 7)];
+                    effect.inverted = eaRandom() < 0.5;
+                    effect.lastResetTime = currentTime;
+                    effect.nextResetInterval = CONFIG.simulation.effectChangeMin + eaRandom() * (CONFIG.simulation.effectChangeMax - CONFIG.simulation.effectChangeMin);
+                }
+            });
+
+            rectManager.update();
+            
+            // PASS 1: Render vector displacement map
+            shiftFbo.begin();
+            clear();
+            shader(shdShift);
+            shdShift.setUniform('u_frameCount', frameCount);
+            shdShift.setUniform('u_gridSize', [width, height]);
+            shdShift.setUniform('u_seed', CONFIG.shaderSeed);
+            shdShift.setUniform('u_turbulence', CONFIG.effects.turbulenceMag);
+            shdShift.setUniform('u_previousPrimaryColor', prevFbo);
+            for (let i = 0; i < CONFIG.simulation.numZones; i++) {
+                let r = rectManager.rectangles[i];
+                if (r) shdShift.setUniform(`u_rect${i}`, [r.x, r.y, r.width, r.height]);
+                let eff = layer1Effects[i];
+                if (eff) {
+                    shdShift.setUniform(`u_effect${i}`, eff.id);
+                    shdShift.setUniform(`u_inverted${i}`, eff.inverted);
+                }
+            }
+            fullScreenQuad();
+            shiftFbo.end();
+
+            // PASS 2: Read vector map, push colors from prevFbo to nextFbo
+            nextFbo.begin();
+            clear();
+            shader(shdPush);
+            shdPush.setUniform('u_frameCount', frameCount);
+            shdPush.setUniform('u_gridSize', [width, height]);
+            shdPush.setUniform('u_seed', CONFIG.shaderSeed);
+            shdPush.setUniform('u_shiftMap', shiftFbo);
+            shdPush.setUniform('u_previousPrimaryColor', prevFbo);
+            for (let i = 0; i < CONFIG.simulation.numZones; i++) {
+                let r = rectManager.rectangles[i];
+                if (r) shdPush.setUniform(`u_rect${i}`, [r.x, r.y, r.width, r.height]);
+                let eff = layer1Effects[i];
+                if (eff) {
+                    shdPush.setUniform(`u_effect${i}`, eff.id);
+                    shdPush.setUniform(`u_inverted${i}`, eff.inverted);
+                }
+            }
+            fullScreenQuad();
+            nextFbo.end();
+
+            // PASS 3: Swap Buffers (Feedback Loop)
+            let temp = prevFbo;
+            prevFbo = nextFbo;
+            nextFbo = temp;
+
+            // PASS 4: Render to Canvas with Post Processing (Sharpening)
+            clear();
+            shader(shdPost);
+            shdPost.setUniform('u_primaryColorIn', nextFbo);
+            shdPost.setUniform('u_gridSize', [width, height]);
+            shdPost.setUniform('u_sharpenIntensity', CONFIG.effects.sharpenIntensity);
+            fullScreenQuad();
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+            prevFbo.resize(width, height);
+            nextFbo.resize(width, height);
+            shiftFbo.resize(width, height);
+            initArtwork();
+        }
+
+        function assignRandomEffects() {
+            layer1Effects = [];
+            const now = frameCount || 0;
+            for (let i = 0; i < CONFIG.simulation.numZones; i++) {
+                layer1Effects.push({
+                    id: CONFIG.activeEffects[Math.floor(eaRandom() * 7)],
+                    inverted: eaRandom() < 0.5,
+                    lastResetTime: now,
+                    nextResetInterval: CONFIG.simulation.effectChangeMin + eaRandom() * (CONFIG.simulation.effectChangeMax - CONFIG.simulation.effectChangeMin)
+                });
+            }
+        }
+    </script>
+</body>
+</html>
