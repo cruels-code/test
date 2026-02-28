@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pixel Drift - Standalone (Sliderless)</title>
     <style>
         /* Ensure the canvas fills the entire browser window without scrollbars */
         body, html {
@@ -13,6 +13,10 @@
             height: 100%;
             overflow: hidden;
             background-color: #000;
+            /* Prevent pull-to-refresh and scrolling on mobile devices */
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
 
         /* Overlay for Info */
@@ -32,8 +36,9 @@
             white-space: pre;
         }
 
-        /* Show overlay when hovering over the window */
-        body:hover #infoOverlay {
+        /* Show overlay when hovering (Desktop) or when toggled via JS (Mobile) */
+        body:hover #infoOverlay,
+        #infoOverlay.visible {
             opacity: 1;
         }
     </style>
@@ -44,6 +49,14 @@
     <div id="infoOverlay"></div>
 
     <script>
+        // Toggle the overlay on tap/click for mobile devices
+        window.addEventListener('pointerdown', function() {
+            let overlay = document.getElementById('infoOverlay');
+            if (overlay) {
+                overlay.classList.toggle('visible');
+            }
+        });
+
         // ==========================================================
         // 1. MOCK EDITART ENVIRONMENT (For Local Testing)
         // ==========================================================
