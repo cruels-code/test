@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>test</title>
+    <title>Pixel Drift - Standalone (Sliderless)</title>
     <style>
         /* Ensure the canvas fills the entire browser window without scrollbars */
         body, html {
@@ -35,18 +35,160 @@
             text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8); /* Ensures readability over bright colors */
             white-space: pre;
         }
+
+        /* Show overlay when hovering (Desktop) or when toggled via JS (Mobile) */
+        body:hover #infoOverlay,
+        #infoOverlay.visible {
+            opacity: 1;
+        }
     </style>
     <!-- Import p5.js library directly from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+    <script>
+        const randomSeedEditArt = 'PixelDrift_Sliderless_Seed_12345';
+    </script>
 </head>
 <body>
     <div id="infoOverlay"></div>
 
     <script>
-        // Manage overlay visibility robustly across desktop and mobile
+        // ==========================================================
+        // EDITART PARAMS (Inlined for standalone testing)
+        // ==========================================================
+        parent.postMessage({ editArtTemplateVersion: 2 }, "*");
+
+        let resetAnimation = false;
+
+        window.capturePreview = false;
+        function triggerPreview() {
+            if (!window.capturePreview) console.log("EditArt: Thumbnail Captured!");
+            window.capturePreview = true;
+            window.parent.postMessage({ type: "sketch-loaded" }, "*");
+        }
+
+        let m0 = 0.5;
+        let m1 = 0.5;
+        let m2 = 0.5;
+        let m3 = 0.5;
+        let m4 = 0.5;
+
+        let randomM0;
+        let randomM1;
+        let randomM2;
+        let randomM3;
+        let randomM4;
+        let randomFull;
+
+        const queryString = window.location.search;
+        if (queryString) {
+            getParams(queryString);
+        }
+
+        seedRandomness();
+
+        function getParam(urlParams, p) {
+            const param = urlParams.get(p);
+            if (param) {
+                let validParam = /^0\.\d{3}$/.test(param);
+                if (validParam) {
+                    return parseFloat(param);
+                }
+            }
+            // If we're testing locally without params, just return 0.5
+            return 0.5;
+        }
+
+        function getParams(queryString) {
+            const urlParams = new URLSearchParams(queryString);
+            m0 = getParam(urlParams, "m0");
+            m1 = getParam(urlParams, "m1");
+            m2 = getParam(urlParams, "m2");
+            m3 = getParam(urlParams, "m3");
+            m4 = getParam(urlParams, "m4");
+        }
+        
+        window.addEventListener("message", (e) => {
+            var data = e.data;
+            if (data.hasOwnProperty("editartQueryString")) {
+                getParams(data["editartQueryString"]);
+                triggerDraw();
+            }
+        });
+
+        function triggerDraw() {
+            seedRandomness();
+            resetAnimation = true;
+            if (typeof isLooping === "function" && !isLooping()) redraw();
+        }
+
+        function windowResized() {
+            seedRandomness();
+            resetAnimation = true;
+            if (typeof windowResizedUser === "function") {
+                windowResizedUser();
+            }
+        }
+
+        function getRNG(num) {
+            return sfc32(...cyrb128(randomSeedEditArt + num.toString()));
+        }
+
+        function seedRandomness() {
+            randomM0 = getRNG(m0);
+            randomM1 = getRNG(m1);
+            randomM2 = getRNG(m2);
+            randomM3 = getRNG(m3);
+            randomM4 = getRNG(m4);
+            randomFull = getRNG(`${m0}${m1}${m2}${m3}${m4}`);
+        }
+
+        function cyrb128(str) {
+            let h1 = 1779033703,
+                h2 = 3144134277,
+                h3 = 1013904242,
+                h4 = 2773480762;
+            for (let i = 0, k; i < str.length; i++) {
+                k = str.charCodeAt(i);
+                h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+                h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+                h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+                h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
+            }
+            h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+            h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+            h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+            h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+            return [
+                (h1 ^ h2 ^ h3 ^ h4) >>> 0,
+                (h2 ^ h1) >>> 0,
+                (h3 ^ h1) >>> 0,
+                (h4 ^ h1) >>> 0,
+            ];
+        }
+
+        function sfc32(a, b, c, d) {
+            return function () {
+                a >>>= 0;
+                b >>>= 0;
+                c >>>= 0;
+                d >>>= 0;
+                var t = (a + b) | 0;
+                a = b ^ (b >>> 9);
+                b = (c + (c << 3)) | 0;
+                c = (c << 21) | (c >>> 11);
+                d = (d + 1) | 0;
+                t = (t + d) | 0;
+                c = (c + t) | 0;
+                return (t >>> 0) / 4294967296;
+            };
+        }
+
+        // ==========================================================
+        // OVERLAY LOGIC
+        // ==========================================================
         window.isOverlayManuallyHidden = false;
 
-        window.addEventListener('pointerdown', function() {
+        window.addEventListener('pointerdown', function(e) {
             let overlay = document.getElementById('infoOverlay');
             if (overlay) {
                 let currentOpacity = window.getComputedStyle(overlay).opacity;
@@ -60,7 +202,6 @@
             }
         });
 
-        // Show on mouse move (desktop only), unless manually hidden by click
         window.addEventListener('pointermove', function(e) {
             if (e.pointerType === 'mouse') {
                 let overlay = document.getElementById('infoOverlay');
@@ -70,35 +211,23 @@
             }
         });
 
-        // Hide when mouse leaves the window entirely
         document.addEventListener('mouseleave', function(e) {
             let overlay = document.getElementById('infoOverlay');
             if (overlay) {
                 overlay.style.opacity = '0';
-                window.isOverlayManuallyHidden = false; // Reset toggle state
+                window.isOverlayManuallyHidden = false;
             }
         });
 
         // ==========================================================
-        // 1. MOCK EDITART ENVIRONMENT (For Local Testing)
-        // ==========================================================
-        if (typeof window.triggerPreview === 'undefined') {
-            window.triggerPreview = function() { console.log("EditArt: Thumbnail Captured!"); };
-        }
-
-        // ==========================================================
         // 2. DETERMINISTIC PRNG & HUMAN-READABLE MAPPINGS
         // ==========================================================
-        let masterSeed = Math.floor(Math.random() * 999999999);
         
+        // We use randomFull() from EditArt instead of eaRandom()
         function eaRandom() {
-            var t = masterSeed += 0x6D2B79F5;
-            t = Math.imul(t ^ t >>> 15, t | 1);
-            t ^= t + Math.imul(t ^ t >>> 7, t | 61);
-            return ((t ^ t >>> 14) >>> 0) / 4294967296;
+            return randomFull();
         }
 
-        // Map integer effect IDs to human readable names for the overlay
         const effectNames = [
             "Vertical Pan", "Horizontal Jitter", "Outward Push", "Turbulence Noise", "Vertical Shear", 
             "Swirl", "Scanline Shift", "Static Noise", "Color Bleed", "Vortex", 
@@ -214,7 +343,7 @@
             let overlay = document.getElementById('infoOverlay');
             if(!overlay) return;
 
-            let html = "<b>ARTWORK SEED: " + masterSeed + "</b><br><br>";
+            let html = "<b>EDITART SLIDERLESS MODE</b><br><br>";
             
             let c0 = rgbToHex(CONFIG.palette[0][0], CONFIG.palette[0][1], CONFIG.palette[0][2]);
             let c1 = rgbToHex(CONFIG.palette[1][0], CONFIG.palette[1][1], CONFIG.palette[1][2]);
@@ -322,7 +451,7 @@
                 vec2 offset = vec2(0.0);
                 vec2 fragCoord = vTexCoord * res;
                 
-                // MOBILE FIX: Explicitly assign array values instead of inline instantiation
+                // Explicitly assign array values
                 mediump vec4 rects[7];
                 rects[0] = u_rect0; rects[1] = u_rect1; rects[2] = u_rect2; rects[3] = u_rect3; rects[4] = u_rect4; rects[5] = u_rect5; rects[6] = u_rect6;
                 
@@ -434,7 +563,7 @@
                 vec2 fragCoord = vTexCoord * res;
                 ivec2 p = ivec2(fragCoord);
                 
-                // MOBILE FIX: Explicitly assign array values
+                // Explicitly assign array values
                 mediump vec4 rects[7];
                 rects[0] = u_rect0; rects[1] = u_rect1; rects[2] = u_rect2; rects[3] = u_rect3; rects[4] = u_rect4; rects[5] = u_rect5; rects[6] = u_rect6;
                 
@@ -582,6 +711,7 @@
         let rectManager;
         let layer1Effects = [];
         let previewTriggered = false;
+        let myFrameCount = 0;
 
         function setup() {
             setAttributes('antialias', false); 
@@ -607,6 +737,8 @@
         }
 
         function initArtwork() {
+            // Seed randomness using the EditArt params logic
+            seedRandomness();
             generateRandomConfig();
             
             rectManager = new RectangleManager(width, height, CONFIG.simulation.splitDepth, 0, CONFIG.simulation.numZones);
@@ -636,6 +768,9 @@
             shdInit.setUniform('u_color3', CONFIG.palette[3]);
             fullScreenQuad();
             nextFbo.end();
+            
+            myFrameCount = 0;
+            previewTriggered = false;
         }
 
         function fullScreenQuad() {
@@ -646,14 +781,20 @@
         }
 
         function draw() {
+            if (resetAnimation) {
+                initArtwork();
+                resetAnimation = false;
+            }
+            myFrameCount++;
+
             if (!shdPush) return; 
 
-            if (!previewTriggered && frameCount > 180 && typeof window.triggerPreview === 'function') {
-                window.triggerPreview();
+            if (!previewTriggered && myFrameCount > 180 && typeof triggerPreview === 'function') {
+                triggerPreview();
                 previewTriggered = true;
             }
 
-            const currentTime = frameCount;
+            const currentTime = myFrameCount;
 
             layer1Effects.forEach((effect) => {
                 if (currentTime - effect.lastResetTime > effect.nextResetInterval) {
@@ -669,7 +810,7 @@
             shiftFbo.begin();
             clear();
             shader(shdShift);
-            shdShift.setUniform('u_frameCount', frameCount);
+            shdShift.setUniform('u_frameCount', myFrameCount);
             shdShift.setUniform('u_gridSize', [width, height]);
             shdShift.setUniform('u_seed', CONFIG.shaderSeed);
             shdShift.setUniform('u_turbulence', CONFIG.effects.turbulenceMag);
@@ -689,7 +830,7 @@
             nextFbo.begin();
             clear();
             shader(shdPush);
-            shdPush.setUniform('u_frameCount', frameCount);
+            shdPush.setUniform('u_frameCount', myFrameCount);
             shdPush.setUniform('u_gridSize', [width, height]);
             shdPush.setUniform('u_seed', CONFIG.shaderSeed);
             shdPush.setUniform('u_shiftMap', shiftFbo);
@@ -718,19 +859,19 @@
             fullScreenQuad();
         }
 
-        function windowResized() {
+        function windowResizedUser() {
             resizeCanvas(windowWidth, windowHeight);
             prevFbo.resize(width, height);
             nextFbo.resize(width, height);
             shiftFbo.resize(width, height);
             
-            masterSeed = Math.floor(masterSeed); 
+            // Re-initialize artwork on resize to match EditArt behavior
             initArtwork();
         }
 
         function assignRandomEffects() {
             layer1Effects = [];
-            const now = frameCount || 0;
+            const now = myFrameCount || 0;
             for (let i = 0; i < CONFIG.simulation.numZones; i++) {
                 layer1Effects.push({
                     id: CONFIG.activeEffects[Math.floor(eaRandom() * 7)],
