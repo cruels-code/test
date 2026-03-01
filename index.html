@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>Pixel Drift - Standalone (Sliderless)</title>
+    <title>Pixel Mosher</title>
     <style>
       /* Ensure the canvas fills the entire browser window without scrollbars */
       body,
@@ -922,7 +922,7 @@
         setAttributes("antialias", false);
         createCanvas(windowWidth, windowHeight, WEBGL);
         pixelDensity(1);
-        noCursor();
+        // noCursor(); // Removed to show the mouse cursor
 
         try {
           shdInit = createShader(vertShader, InitialPixelShader);
