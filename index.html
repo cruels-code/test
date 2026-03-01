@@ -1,387 +1,511 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>test</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Pixel Drift - Standalone (Sliderless)</title>
     <style>
-        /* Ensure the canvas fills the entire browser window without scrollbars */
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #000;
-            /* Prevent pull-to-refresh and scrolling on mobile devices */
-            touch-action: none;
-            -webkit-user-select: none;
-            user-select: none;
-        }
+      /* Ensure the canvas fills the entire browser window without scrollbars */
+      body,
+      html {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background-color: #000;
+        /* Prevent pull-to-refresh and scrolling on mobile devices */
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+      }
 
-        /* Overlay for Info */
-        #infoOverlay {
-            position: absolute;
-            bottom: 20px;
-            left: 20px;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
-            color: rgba(255, 255, 255, 0.7); /* 30% transparent */
-            pointer-events: none; /* Allows clicking/hovering through the text */
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            z-index: 100;
-            line-height: 1.5;
-            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8); /* Ensures readability over bright colors */
-            white-space: pre;
-        }
+      /* Overlay for Info */
+      #infoOverlay {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        font-family: "Courier New", Courier, monospace;
+        font-size: 12px;
+        color: rgba(255, 255, 255, 0.7); /* 30% transparent */
+        pointer-events: none; /* Allows clicking/hovering through the text */
+        opacity: 0;
+        transition: opacity 0.4s ease;
+        z-index: 100;
+        line-height: 1.5;
+        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8); /* Ensures readability over bright colors */
+        white-space: pre;
+      }
 
-        /* Show overlay when hovering (Desktop) or when toggled via JS (Mobile) */
-        body:hover #infoOverlay,
-        #infoOverlay.visible {
-            opacity: 1;
-        }
+      /* Show overlay when hovering (Desktop) or when toggled via JS (Mobile) */
+      body:hover #infoOverlay,
+      #infoOverlay.visible {
+        opacity: 1;
+      }
     </style>
     <!-- Import p5.js library directly from CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
     <script>
-        const randomSeedEditArt = 'PixelDrift_Sliderless_Seed_12345';
+      const randomSeedEditArt = "PixelDrift_Sliderless_Seed_12345";
     </script>
-</head>
-<body>
+  </head>
+  <body>
     <div id="infoOverlay"></div>
 
     <script>
-        // ==========================================================
-        // EDITART PARAMS (Inlined for standalone testing)
-        // ==========================================================
-        parent.postMessage({ editArtTemplateVersion: 2 }, "*");
+      // ==========================================================
+      // EDITART PARAMS (Inlined for standalone testing)
+      // ==========================================================
+      parent.postMessage({ editArtTemplateVersion: 2 }, "*");
 
-        let resetAnimation = false;
+      let resetAnimation = false;
 
-        window.capturePreview = false;
-        function triggerPreview() {
-            if (!window.capturePreview) console.log("EditArt: Thumbnail Captured!");
-            window.capturePreview = true;
-            window.parent.postMessage({ type: "sketch-loaded" }, "*");
+      window.capturePreview = false;
+      function triggerPreview() {
+        if (!window.capturePreview) console.log("EditArt: Thumbnail Captured!");
+        window.capturePreview = true;
+        window.parent.postMessage({ type: "sketch-loaded" }, "*");
+      }
+
+      let m0 = 0.5;
+      let m1 = 0.5;
+      let m2 = 0.5;
+      let m3 = 0.5;
+      let m4 = 0.5;
+
+      let randomM0;
+      let randomM1;
+      let randomM2;
+      let randomM3;
+      let randomM4;
+      let randomFull;
+
+      const queryString = window.location.search;
+      if (queryString) {
+        getParams(queryString);
+      }
+
+      seedRandomness();
+
+      function getParam(urlParams, p) {
+        const param = urlParams.get(p);
+        if (param) {
+          let validParam = /^0\.\d{3}$/.test(param);
+          if (validParam) {
+            return parseFloat(param);
+          }
         }
+        // If we're testing locally without params, just return 0.5
+        return 0.5;
+      }
 
-        let m0 = 0.5;
-        let m1 = 0.5;
-        let m2 = 0.5;
-        let m3 = 0.5;
-        let m4 = 0.5;
+      function getParams(queryString) {
+        const urlParams = new URLSearchParams(queryString);
+        m0 = getParam(urlParams, "m0");
+        m1 = getParam(urlParams, "m1");
+        m2 = getParam(urlParams, "m2");
+        m3 = getParam(urlParams, "m3");
+        m4 = getParam(urlParams, "m4");
+      }
 
-        let randomM0;
-        let randomM1;
-        let randomM2;
-        let randomM3;
-        let randomM4;
-        let randomFull;
-
-        const queryString = window.location.search;
-        if (queryString) {
-            getParams(queryString);
+      window.addEventListener("message", (e) => {
+        var data = e.data;
+        if (data.hasOwnProperty("editartQueryString")) {
+          getParams(data["editartQueryString"]);
+          triggerDraw();
         }
+      });
 
+      function triggerDraw() {
         seedRandomness();
+        resetAnimation = true;
+        if (typeof isLooping === "function" && !isLooping()) redraw();
+      }
 
-        function getParam(urlParams, p) {
-            const param = urlParams.get(p);
-            if (param) {
-                let validParam = /^0\.\d{3}$/.test(param);
-                if (validParam) {
-                    return parseFloat(param);
-                }
-            }
-            // If we're testing locally without params, just return 0.5
-            return 0.5;
+      function windowResized() {
+        seedRandomness();
+        resetAnimation = true;
+        if (typeof windowResizedUser === "function") {
+          windowResizedUser();
         }
+      }
 
-        function getParams(queryString) {
-            const urlParams = new URLSearchParams(queryString);
-            m0 = getParam(urlParams, "m0");
-            m1 = getParam(urlParams, "m1");
-            m2 = getParam(urlParams, "m2");
-            m3 = getParam(urlParams, "m3");
-            m4 = getParam(urlParams, "m4");
+      function getRNG(num) {
+        return sfc32(...cyrb128(randomSeedEditArt + num.toString()));
+      }
+
+      function seedRandomness() {
+        randomM0 = getRNG(m0);
+        randomM1 = getRNG(m1);
+        randomM2 = getRNG(m2);
+        randomM3 = getRNG(m3);
+        randomM4 = getRNG(m4);
+        randomFull = getRNG(`${m0}${m1}${m2}${m3}${m4}`);
+      }
+
+      function cyrb128(str) {
+        let h1 = 1779033703,
+          h2 = 3144134277,
+          h3 = 1013904242,
+          h4 = 2773480762;
+        for (let i = 0, k; i < str.length; i++) {
+          k = str.charCodeAt(i);
+          h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
+          h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
+          h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
+          h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
         }
-        
-        window.addEventListener("message", (e) => {
-            var data = e.data;
-            if (data.hasOwnProperty("editartQueryString")) {
-                getParams(data["editartQueryString"]);
-                triggerDraw();
-            }
-        });
+        h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
+        h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
+        h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
+        h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
+        return [
+          (h1 ^ h2 ^ h3 ^ h4) >>> 0,
+          (h2 ^ h1) >>> 0,
+          (h3 ^ h1) >>> 0,
+          (h4 ^ h1) >>> 0,
+        ];
+      }
 
-        function triggerDraw() {
-            seedRandomness();
-            resetAnimation = true;
-            if (typeof isLooping === "function" && !isLooping()) redraw();
+      function sfc32(a, b, c, d) {
+        return function () {
+          a >>>= 0;
+          b >>>= 0;
+          c >>>= 0;
+          d >>>= 0;
+          var t = (a + b) | 0;
+          a = b ^ (b >>> 9);
+          b = (c + (c << 3)) | 0;
+          c = (c << 21) | (c >>> 11);
+          d = (d + 1) | 0;
+          t = (t + d) | 0;
+          c = (c + t) | 0;
+          return (t >>> 0) / 4294967296;
+        };
+      }
+
+      // ==========================================================
+      // OVERLAY LOGIC
+      // ==========================================================
+      window.isOverlayManuallyHidden = false;
+
+      window.addEventListener("pointerdown", function (e) {
+        let overlay = document.getElementById("infoOverlay");
+        if (overlay) {
+          let currentOpacity = window.getComputedStyle(overlay).opacity;
+          if (currentOpacity === "1" || overlay.style.opacity === "1") {
+            overlay.style.opacity = "0";
+            window.isOverlayManuallyHidden = true;
+          } else {
+            overlay.style.opacity = "1";
+            window.isOverlayManuallyHidden = false;
+          }
         }
+      });
 
-        function windowResized() {
-            seedRandomness();
-            resetAnimation = true;
-            if (typeof windowResizedUser === "function") {
-                windowResizedUser();
-            }
+      window.addEventListener("pointermove", function (e) {
+        if (e.pointerType === "mouse") {
+          let overlay = document.getElementById("infoOverlay");
+          if (overlay && !window.isOverlayManuallyHidden) {
+            overlay.style.opacity = "1";
+          }
         }
+      });
 
-        function getRNG(num) {
-            return sfc32(...cyrb128(randomSeedEditArt + num.toString()));
+      document.addEventListener("mouseleave", function (e) {
+        let overlay = document.getElementById("infoOverlay");
+        if (overlay) {
+          overlay.style.opacity = "0";
+          window.isOverlayManuallyHidden = false;
         }
+      });
 
-        function seedRandomness() {
-            randomM0 = getRNG(m0);
-            randomM1 = getRNG(m1);
-            randomM2 = getRNG(m2);
-            randomM3 = getRNG(m3);
-            randomM4 = getRNG(m4);
-            randomFull = getRNG(`${m0}${m1}${m2}${m3}${m4}`);
+      // ==========================================================
+      // 2. DETERMINISTIC PRNG & HUMAN-READABLE MAPPINGS
+      // ==========================================================
+
+      let initialSeed = 0;
+      let masterSeed = 0;
+
+      // Use the original PRNG so the seed matches the Master version exactly
+      function eaRandom() {
+        var t = (masterSeed += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      }
+
+      window.copySeed = function (seed, el, event) {
+        event.stopPropagation();
+        try {
+          navigator.clipboard
+            .writeText(seed)
+            .then(() => {
+              el.innerText = "Copied!";
+              setTimeout(() => (el.innerText = "Seed: " + seed), 2000);
+            })
+            .catch((err) => {
+              fallbackCopy(seed, el);
+            });
+        } catch (e) {
+          fallbackCopy(seed, el);
         }
+      };
 
-        function cyrb128(str) {
-            let h1 = 1779033703,
-                h2 = 3144134277,
-                h3 = 1013904242,
-                h4 = 2773480762;
-            for (let i = 0, k; i < str.length; i++) {
-                k = str.charCodeAt(i);
-                h1 = h2 ^ Math.imul(h1 ^ k, 597399067);
-                h2 = h3 ^ Math.imul(h2 ^ k, 2869860233);
-                h3 = h4 ^ Math.imul(h3 ^ k, 951274213);
-                h4 = h1 ^ Math.imul(h4 ^ k, 2716044179);
-            }
-            h1 = Math.imul(h3 ^ (h1 >>> 18), 597399067);
-            h2 = Math.imul(h4 ^ (h2 >>> 22), 2869860233);
-            h3 = Math.imul(h1 ^ (h3 >>> 17), 951274213);
-            h4 = Math.imul(h2 ^ (h4 >>> 19), 2716044179);
-            return [
-                (h1 ^ h2 ^ h3 ^ h4) >>> 0,
-                (h2 ^ h1) >>> 0,
-                (h3 ^ h1) >>> 0,
-                (h4 ^ h1) >>> 0,
-            ];
+      function fallbackCopy(seed, el) {
+        let textArea = document.createElement("textarea");
+        textArea.value = seed;
+        textArea.style.position = "fixed";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand("copy");
+          el.innerText = "Copied!";
+        } catch (err) {
+          el.innerText = "Failed to copy";
         }
+        document.body.removeChild(textArea);
+        setTimeout(() => (el.innerText = "Seed: " + seed), 2000);
+      }
 
-        function sfc32(a, b, c, d) {
-            return function () {
-                a >>>= 0;
-                b >>>= 0;
-                c >>>= 0;
-                d >>>= 0;
-                var t = (a + b) | 0;
-                a = b ^ (b >>> 9);
-                b = (c + (c << 3)) | 0;
-                c = (c << 21) | (c >>> 11);
-                d = (d + 1) | 0;
-                t = (t + d) | 0;
-                c = (c + t) | 0;
-                return (t >>> 0) / 4294967296;
-            };
+      const effectNames = [
+        "Vertical Pan",
+        "Horizontal Jitter",
+        "Outward Push",
+        "Turbulence Noise",
+        "Vertical Shear",
+        "Swirl",
+        "Scanline Shift",
+        "Static Noise",
+        "Color Bleed",
+        "Vortex",
+        "Sine Wave Y",
+        "Twist",
+        "Circular Noise",
+        "Pinch",
+        "Zoom/Scale",
+        "Pixelate Shift",
+        "Sine Wave X",
+        "Random Scatter",
+        "Wind Right",
+        "Spiral Out",
+        "Bulge",
+        "Dent",
+        "Stretch X",
+        "Stretch Y",
+        "Ripple",
+        "Pulsate",
+        "Lens Distortion",
+        "Kaleidoscope",
+        "Fold",
+        "Orbit",
+        "Lissajous",
+        "Blocky Noise",
+        "ZigZag",
+        "Vortex Ripple",
+        "Noise Drip",
+        "Scanline Drip",
+        "Binary Noise",
+        "Smear Right",
+        "Smear Left",
+        "Radial Bands",
+        "Fish Eye",
+        "Tear",
+        "Diagonal Split",
+        "Star Burst",
+        "Grid Warp",
+        "Implode",
+        "Zoom Pulse",
+        "Invert (Color)",
+        "Droplet Swell",
+        "Snake Wriggle",
+      ];
+
+      // ==========================================================
+      // 3. COLOR GENERATION & UTILITIES
+      // ==========================================================
+      function hslToRgb(h, s, l, hdrMultiplier = 1.0) {
+        let r, g, b;
+        if (s === 0) {
+          r = g = b = l;
+        } else {
+          const hue2rgb = (p, q, t) => {
+            if (t < 0) t += 1;
+            if (t > 1) t -= 1;
+            if (t < 1 / 6) return p + (q - p) * 6 * t;
+            if (t < 1 / 2) return q;
+            if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+            return p;
+          };
+          const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+          const p = 2 * l - q;
+          r = hue2rgb(p, q, h + 1 / 3);
+          g = hue2rgb(p, q, h);
+          b = hue2rgb(p, q, h - 1 / 3);
         }
+        return [r * hdrMultiplier, g * hdrMultiplier, b * hdrMultiplier];
+      }
 
-        // ==========================================================
-        // OVERLAY LOGIC
-        // ==========================================================
-        window.isOverlayManuallyHidden = false;
+      function rgbToHex(r, g, b) {
+        const toHex = (c) => {
+          const hex = Math.max(0, Math.min(255, Math.round(c * 255)))
+            .toString(16)
+            .toUpperCase();
+          return hex.length === 1 ? "0" + hex : hex;
+        };
+        return "#" + toHex(r) + toHex(g) + toHex(b);
+      }
 
-        window.addEventListener('pointerdown', function(e) {
-            let overlay = document.getElementById('infoOverlay');
-            if (overlay) {
-                let currentOpacity = window.getComputedStyle(overlay).opacity;
-                if (currentOpacity === '1' || overlay.style.opacity === '1') {
-                    overlay.style.opacity = '0';
-                    window.isOverlayManuallyHidden = true;
-                } else {
-                    overlay.style.opacity = '1';
-                    window.isOverlayManuallyHidden = false;
-                }
-            }
-        });
+      // ==========================================================
+      // 4. GLOBAL ENGINE CONFIGURATION & OVERLAY
+      // ==========================================================
+      let CONFIG = {};
 
-        window.addEventListener('pointermove', function(e) {
-            if (e.pointerType === 'mouse') {
-                let overlay = document.getElementById('infoOverlay');
-                if (overlay && !window.isOverlayManuallyHidden) {
-                    overlay.style.opacity = '1';
-                }
-            }
-        });
+      function generateRandomConfig() {
+        let p_palette = eaRandom();
+        let p_speed = eaRandom();
+        let p_depth = eaRandom();
+        let p_sharpen = eaRandom();
 
-        document.addEventListener('mouseleave', function(e) {
-            let overlay = document.getElementById('infoOverlay');
-            if (overlay) {
-                overlay.style.opacity = '0';
-                window.isOverlayManuallyHidden = false;
-            }
-        });
+        let hdr = 1.2 + eaRandom() * 0.8;
 
-        // ==========================================================
-        // 2. DETERMINISTIC PRNG & HUMAN-READABLE MAPPINGS
-        // ==========================================================
-        
-        // We use randomFull() from EditArt instead of eaRandom()
-        function eaRandom() {
-            return randomFull();
-        }
+        let baseHue = eaRandom();
+        let compHue = (baseHue + 0.5) % 1.0;
+        let splitHue1 = (baseHue + 0.25 + eaRandom() * 0.1) % 1.0;
+        let splitHue2 = (baseHue + 0.75 - eaRandom() * 0.1) % 1.0;
 
-        const effectNames = [
-            "Vertical Pan", "Horizontal Jitter", "Outward Push", "Turbulence Noise", "Vertical Shear", 
-            "Swirl", "Scanline Shift", "Static Noise", "Color Bleed", "Vortex", 
-            "Sine Wave Y", "Twist", "Circular Noise", "Pinch", "Zoom/Scale", 
-            "Pixelate Shift", "Sine Wave X", "Random Scatter", "Wind Right", "Spiral Out", 
-            "Bulge", "Dent", "Stretch X", "Stretch Y", "Ripple", 
-            "Pulsate", "Lens Distortion", "Kaleidoscope", "Fold", "Orbit", 
-            "Lissajous", "Blocky Noise", "ZigZag", "Vortex Ripple", "Noise Drip", 
-            "Scanline Drip", "Binary Noise", "Smear Right", "Smear Left", "Radial Bands", 
-            "Fish Eye", "Tear", "Diagonal Split", "Star Burst", "Grid Warp", 
-            "Implode", "Zoom Pulse", "Invert (Color)", "Droplet Swell", "Snake Wriggle"
+        let palette = [
+          hslToRgb(
+            baseHue,
+            0.8 + eaRandom() * 0.2,
+            0.1 + eaRandom() * 0.1,
+            1.0,
+          ),
+          hslToRgb(
+            compHue,
+            0.9 + eaRandom() * 0.1,
+            0.4 + eaRandom() * 0.1,
+            hdr,
+          ),
+          hslToRgb(
+            splitHue1,
+            0.8 + eaRandom() * 0.2,
+            0.5 + eaRandom() * 0.1,
+            hdr,
+          ),
+          hslToRgb(
+            splitHue2,
+            0.9 + eaRandom() * 0.1,
+            0.6 + eaRandom() * 0.1,
+            hdr * 1.2,
+          ),
         ];
 
-        // ==========================================================
-        // 3. COLOR GENERATION & UTILITIES
-        // ==========================================================
-        function hslToRgb(h, s, l, hdrMultiplier = 1.0) {
-            let r, g, b;
-            if (s === 0) {
-                r = g = b = l; 
-            } else {
-                const hue2rgb = (p, q, t) => {
-                    if (t < 0) t += 1;
-                    if (t > 1) t -= 1;
-                    if (t < 1/6) return p + (q - p) * 6 * t;
-                    if (t < 1/2) return q;
-                    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-                    return p;
-                };
-                const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-                const p = 2 * l - q;
-                r = hue2rgb(p, q, h + 1/3);
-                g = hue2rgb(p, q, h);
-                b = hue2rgb(p, q, h - 1/3);
-            }
-            return [r * hdrMultiplier, g * hdrMultiplier, b * hdrMultiplier];
+        let allEffects = Array.from({ length: 50 }, (_, i) => i);
+        for (let i = allEffects.length - 1; i > 0; i--) {
+          const j = Math.floor(eaRandom() * (i + 1));
+          [allEffects[i], allEffects[j]] = [allEffects[j], allEffects[i]];
+        }
+        let activeEffects = allEffects.slice(0, 7);
+
+        CONFIG = {
+          paletteSeed: p_palette,
+          palette: palette,
+          activeEffects: activeEffects,
+          simulation: {
+            numZones: 7,
+            splitDepth: Math.floor(1 + p_depth * 4),
+            effectChangeMin: Math.floor(30 + p_speed * 60),
+            effectChangeMax: Math.floor(120 + p_speed * 240),
+          },
+          movement: {
+            zoneSpeedMax: 2.0 + p_speed * 6.0,
+            easing: 0.05,
+            stutterChance: 0.05,
+            stutterMagnitude: 30.0,
+          },
+          effects: {
+            turbulenceMag: 2.0 + p_speed * 8.0,
+            sharpenIntensity: p_sharpen * 1.5,
+          },
+          shaderSeed: eaRandom() * 1000.0,
+        };
+
+        window.editartFeatures = {
+          Complexity: CONFIG.simulation.splitDepth.toString(),
+          "Fluid Speed":
+            p_speed > 0.7 ? "Fast" : p_speed > 0.3 ? "Moderate" : "Slow",
+          "Aesthetic Style": p_sharpen > 0.6 ? "Hard Edges" : "Soft Liquid",
+          "Primary Hue": Math.floor(baseHue * 360) + " Degrees",
+        };
+
+        updateOverlayInfo(); // Update UI
+      }
+
+      function updateOverlayInfo() {
+        let overlay = document.getElementById("infoOverlay");
+        if (!overlay) return;
+
+        let html = "<b>CONFIGURATION:</b><br>";
+        html += `<span id="seedCopy" style="pointer-events: auto; cursor: pointer; text-decoration: underline;" title="Click to copy seed" onpointerdown="window.copySeed('${initialSeed}', this, event)">Seed: ${initialSeed}</span><br><br>`;
+
+        let c0 = rgbToHex(
+          CONFIG.palette[0][0],
+          CONFIG.palette[0][1],
+          CONFIG.palette[0][2],
+        );
+        let c1 = rgbToHex(
+          CONFIG.palette[1][0],
+          CONFIG.palette[1][1],
+          CONFIG.palette[1][2],
+        );
+        let c2 = rgbToHex(
+          CONFIG.palette[2][0],
+          CONFIG.palette[2][1],
+          CONFIG.palette[2][2],
+        );
+        let c3 = rgbToHex(
+          CONFIG.palette[3][0],
+          CONFIG.palette[3][1],
+          CONFIG.palette[3][2],
+        );
+
+        if (CONFIG.paletteSeed < 0.33) {
+          html += "<b>LAYOUT:</b> Split Screen (Solid)<br>";
+          html += "<b>COLORS:</b><br>";
+          html += `- Left:  ${c0}<br>`;
+          html += `- Right: ${c1}<br>`;
+        } else if (CONFIG.paletteSeed < 0.66) {
+          html += "<b>LAYOUT:</b> Full Screen Gradient<br>";
+          html += "<b>COLORS:</b><br>";
+          html += `- Top:    ${c0} → ${c2}<br>`;
+          html += `- Bottom: ${c1} → ${c3}<br>`;
+        } else {
+          html += "<b>LAYOUT:</b> Geometric Quad (Solid)<br>";
+          html += "<b>COLORS:</b><br>";
+          html += `- Top Left:     ${c0}<br>`;
+          html += `- Top Right:    ${c1}<br>`;
+          html += `- Bottom Left:  ${c2}<br>`;
+          html += `- Bottom Right: ${c3}<br>`;
         }
 
-        function rgbToHex(r, g, b) {
-            const toHex = (c) => {
-                const hex = Math.max(0, Math.min(255, Math.round(c * 255))).toString(16).toUpperCase();
-                return hex.length === 1 ? "0" + hex : hex;
-            };
-            return "#" + toHex(r) + toHex(g) + toHex(b);
+        html += "<br><b>ACTIVE EFFECTS:</b><br>";
+        for (let i = 0; i < 7; i++) {
+          let effId = CONFIG.activeEffects[i];
+          html += "- " + (effectNames[effId] || "Effect #" + effId) + "<br>";
         }
 
-        // ==========================================================
-        // 4. GLOBAL ENGINE CONFIGURATION & OVERLAY
-        // ==========================================================
-        let CONFIG = {};
+        overlay.innerHTML = html;
+      }
 
-        function generateRandomConfig() {
-            let p_palette = eaRandom();
-            let p_speed   = eaRandom();
-            let p_depth   = eaRandom();
-            let p_sharpen = eaRandom();
-            
-            let hdr = 1.2 + (eaRandom() * 0.8); 
-            
-            let baseHue = eaRandom();
-            let compHue = (baseHue + 0.5) % 1.0; 
-            let splitHue1 = (baseHue + 0.25 + eaRandom() * 0.1) % 1.0;
-            let splitHue2 = (baseHue + 0.75 - eaRandom() * 0.1) % 1.0;
-            
-            let palette = [
-                hslToRgb(baseHue, 0.8 + eaRandom() * 0.2, 0.1 + eaRandom() * 0.1, 1.0), 
-                hslToRgb(compHue, 0.9 + eaRandom() * 0.1, 0.4 + eaRandom() * 0.1, hdr), 
-                hslToRgb(splitHue1, 0.8 + eaRandom() * 0.2, 0.5 + eaRandom() * 0.1, hdr), 
-                hslToRgb(splitHue2, 0.9 + eaRandom() * 0.1, 0.6 + eaRandom() * 0.1, hdr * 1.2) 
-            ];
-
-            let allEffects = Array.from({length: 50}, (_, i) => i);
-            for (let i = allEffects.length - 1; i > 0; i--) {
-                const j = Math.floor(eaRandom() * (i + 1));
-                [allEffects[i], allEffects[j]] = [allEffects[j], allEffects[i]];
-            }
-            let activeEffects = allEffects.slice(0, 7);
-            
-            CONFIG = {
-                paletteSeed: p_palette,
-                palette: palette,
-                activeEffects: activeEffects,
-                simulation: {
-                    numZones: 7, 
-                    splitDepth: Math.floor(1 + p_depth * 4), 
-                    effectChangeMin: Math.floor(30 + p_speed * 60),
-                    effectChangeMax: Math.floor(120 + p_speed * 240),
-                },
-                movement: {
-                    zoneSpeedMax: 2.0 + p_speed * 6.0,
-                    easing: 0.05,
-                    stutterChance: 0.05,
-                    stutterMagnitude: 30.0
-                },
-                effects: {
-                    turbulenceMag: 2.0 + (p_speed * 8.0),
-                    sharpenIntensity: p_sharpen * 1.5 
-                },
-                shaderSeed: eaRandom() * 1000.0 
-            };
-
-            window.editartFeatures = {
-                "Complexity": CONFIG.simulation.splitDepth.toString(),
-                "Fluid Speed": p_speed > 0.7 ? "Fast" : p_speed > 0.3 ? "Moderate" : "Slow",
-                "Aesthetic Style": p_sharpen > 0.6 ? "Hard Edges" : "Soft Liquid",
-                "Primary Hue": Math.floor(baseHue * 360) + " Degrees"
-            };
-
-            updateOverlayInfo(); // Update UI
-        }
-
-        function updateOverlayInfo() {
-            let overlay = document.getElementById('infoOverlay');
-            if(!overlay) return;
-
-            let html = "<b>EDITART SLIDERLESS MODE</b><br><br>";
-            
-            let c0 = rgbToHex(CONFIG.palette[0][0], CONFIG.palette[0][1], CONFIG.palette[0][2]);
-            let c1 = rgbToHex(CONFIG.palette[1][0], CONFIG.palette[1][1], CONFIG.palette[1][2]);
-            let c2 = rgbToHex(CONFIG.palette[2][0], CONFIG.palette[2][1], CONFIG.palette[2][2]);
-            let c3 = rgbToHex(CONFIG.palette[3][0], CONFIG.palette[3][1], CONFIG.palette[3][2]);
-
-            if (CONFIG.paletteSeed < 0.33) {
-                html += "<b>LAYOUT:</b> Split Screen (Solid)<br>";
-                html += "<b>COLORS:</b><br>";
-                html += `- Left:  ${c0}<br>`;
-                html += `- Right: ${c1}<br>`;
-            } else if (CONFIG.paletteSeed < 0.66) {
-                html += "<b>LAYOUT:</b> Full Screen Gradient<br>";
-                html += "<b>COLORS:</b><br>";
-                html += `- Top:    ${c0} → ${c2}<br>`;
-                html += `- Bottom: ${c1} → ${c3}<br>`;
-            } else {
-                html += "<b>LAYOUT:</b> Geometric Quad (Solid)<br>";
-                html += "<b>COLORS:</b><br>";
-                html += `- Top Left:     ${c0}<br>`;
-                html += `- Top Right:    ${c1}<br>`;
-                html += `- Bottom Left:  ${c2}<br>`;
-                html += `- Bottom Right: ${c3}<br>`;
-            }
-
-            html += "<br><b>ACTIVE EFFECTS:</b><br>";
-            for(let i = 0; i < 7; i++) {
-                let effId = CONFIG.activeEffects[i];
-                html += "- " + (effectNames[effId] || ("Effect #" + effId)) + "<br>";
-            }
-
-            overlay.innerHTML = html;
-        }
-
-        // ==========================================================
-        // 5. GLSL SHADERS (WEBGL 2.0)
-        // ==========================================================
-        const vertShader = `#version 300 es
+      // ==========================================================
+      // 5. GLSL SHADERS (WEBGL 2.0)
+      // ==========================================================
+      const vertShader = `#version 300 es
             in vec3 aPosition;
             in vec2 aTexCoord;
             out vec2 vTexCoord;
@@ -390,7 +514,7 @@
                 gl_Position = vec4(aPosition, 1.0);
             }`;
 
-        const InitialPixelShader = `#version 300 es
+      const InitialPixelShader = `#version 300 es
             precision mediump float;
             uniform vec2 u_gridSize;
             uniform float u_paletteSeed;
@@ -420,7 +544,7 @@
                 fragColor = vec4(color, 1.0);
             }`;
 
-        const PixelDisplacementShader = `#version 300 es
+      const PixelDisplacementShader = `#version 300 es
             precision mediump float;
             precision mediump int;
             in vec2 vTexCoord;
@@ -536,7 +660,7 @@
                 fragColor = vec4((offPix.x + 1.0) * 0.5, (offPix.y + 1.0) * 0.5, 0.0, 1.0);
             }`;
 
-        const PixelUpdateShader = `#version 300 es
+      const PixelUpdateShader = `#version 300 es
             precision mediump float;
             precision mediump int;
             in vec2 vTexCoord;
@@ -602,7 +726,7 @@
                 fragColor = pc;
             }`;
 
-        const PostProcessShader = `#version 300 es
+      const PostProcessShader = `#version 300 es
             precision mediump float;
             precision mediump int;
             in vec2 vTexCoord;
@@ -623,264 +747,378 @@
                 fragColor = clamp(mix(center, sharpened, u_sharpenIntensity), 0.0, 1.0);
             }`;
 
-        // ==========================================================
-        // 6. RECTANGLE / ZONE MANAGER
-        // ==========================================================
-        class RectangleManager {
-            constructor(gridCols, gridRows, splitDepth, spacing, maxRectangleCount) {
-                this.gridCols = gridCols;
-                this.gridRows = gridRows;
-                this.maxRectangleCount = maxRectangleCount;
-                this.splitDepth = splitDepth;
-                this.spacing = Math.max(0, Math.floor(spacing));
-                this.rectangles = [];
-            }
-
-            initializeRectangles() {
-                this.rectangles = [];
-                const container = { x: 0, y: 0, width: Math.floor(this.gridCols), height: Math.floor(this.gridRows) };
-                this.splitSpace(container, 0);
-                if (this.rectangles.length > this.maxRectangleCount) this.rectangles.length = this.maxRectangleCount;
-                
-                while (this.rectangles.length < this.maxRectangleCount) {
-                    this.rectangles.push({ x: 0, y: 0, width: 0, height: 0, vx: 0, vy: 0, targetVx: 0, targetVy: 0 });
-                }
-            }
-
-            splitSpace(container, depth) {
-                if (depth >= this.splitDepth || this.rectangles.length >= this.maxRectangleCount) {
-                    const vx = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax;
-                    const vy = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax;
-                    this.rectangles.push({ ...container, vx, vy, targetVx: vx, targetVy: vy });
-                    return;
-                }
-                const horiz = eaRandom() > 0.5;
-                if (horiz) {
-                    if (container.height < this.spacing + 2) {
-                        this.rectangles.push({ ...container, vx: 0, vy: 0, targetVx: 0, targetVy: 0 });
-                        return;
-                    }
-                    const sp = Math.floor(eaRandom() * (container.height - this.spacing - 1)) + 1;
-                    this.splitSpace({ x: container.x, y: container.y, width: container.width, height: sp }, depth + 1);
-                    this.splitSpace({ x: container.x, y: container.y + sp + this.spacing, width: container.width, height: container.height - sp - this.spacing }, depth + 1);
-                } else {
-                    if (container.width < this.spacing + 2) {
-                        this.rectangles.push({ ...container, vx: 0, vy: 0, targetVx: 0, targetVy: 0 });
-                        return;
-                    }
-                    const sp = Math.floor(eaRandom() * (container.width - this.spacing - 1)) + 1;
-                    this.splitSpace({ x: container.x, y: container.y, width: sp, height: container.height }, depth + 1);
-                    this.splitSpace({ x: container.x + sp + this.spacing, y: container.y, width: container.width - sp - this.spacing, height: container.height }, depth + 1);
-                }
-            }
-
-            update() {
-                this.rectangles.forEach(rect => {
-                    if (rect.width === 0) return;
-                    
-                    if (eaRandom() < CONFIG.movement.stutterChance) {
-                        rect.x += (eaRandom() - 0.5) * CONFIG.movement.stutterMagnitude;
-                        rect.y += (eaRandom() - 0.5) * CONFIG.movement.stutterMagnitude;
-                        rect.targetVx = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax * 2.0;
-                        rect.targetVy = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax * 2.0;
-                    }
-                    
-                    rect.vx += (rect.targetVx - rect.vx) * CONFIG.movement.easing;
-                    rect.vy += (rect.targetVy - rect.vy) * CONFIG.movement.easing;
-                    rect.x += rect.vx;
-                    rect.y += rect.vy;
-                    
-                    if (rect.x <= 0 || rect.x + rect.width >= this.gridCols) {
-                        rect.vx *= -1; rect.targetVx *= -1;
-                    }
-                    if (rect.y <= 0 || rect.y + rect.height >= this.gridRows) {
-                        rect.vy *= -1; rect.targetVy *= -1;
-                    }
-                    
-                    rect.x = Math.max(0, Math.min(rect.x, this.gridCols - rect.width));
-                    rect.y = Math.max(0, Math.min(rect.y, this.gridRows - rect.height));
-                });
-            }
+      // ==========================================================
+      // 6. RECTANGLE / ZONE MANAGER
+      // ==========================================================
+      class RectangleManager {
+        constructor(
+          gridCols,
+          gridRows,
+          splitDepth,
+          spacing,
+          maxRectangleCount,
+        ) {
+          this.gridCols = gridCols;
+          this.gridRows = gridRows;
+          this.maxRectangleCount = maxRectangleCount;
+          this.splitDepth = splitDepth;
+          this.spacing = Math.max(0, Math.floor(spacing));
+          this.rectangles = [];
         }
 
-        // ==========================================================
-        // 7. MAIN P5.JS LIFECYCLE
-        // ==========================================================
-        let shdInit, shdShift, shdPush, shdPost;
-        let prevFbo, nextFbo, shiftFbo;
-        let rectManager;
-        let layer1Effects = [];
-        let previewTriggered = false;
-        let myFrameCount = 0;
+        initializeRectangles() {
+          this.rectangles = [];
+          const container = {
+            x: 0,
+            y: 0,
+            width: Math.floor(this.gridCols),
+            height: Math.floor(this.gridRows),
+          };
+          this.splitSpace(container, 0);
+          if (this.rectangles.length > this.maxRectangleCount)
+            this.rectangles.length = this.maxRectangleCount;
 
-        function setup() {
-            setAttributes('antialias', false); 
-            createCanvas(windowWidth, windowHeight, WEBGL);
-            pixelDensity(1); 
-            noCursor(); 
-
-            try {
-                shdInit  = createShader(vertShader, InitialPixelShader);
-                shdShift = createShader(vertShader, PixelDisplacementShader);
-                shdPush  = createShader(vertShader, PixelUpdateShader);
-                shdPost  = createShader(vertShader, PostProcessShader);
-            } catch (e) {
-                console.error("Shader failed to compile: " + e.message);
-                return;
-            }
-
-            prevFbo  = createFramebuffer();
-            nextFbo  = createFramebuffer();
-            shiftFbo = createFramebuffer();
-
-            initArtwork();
-        }
-
-        function initArtwork() {
-            // Seed randomness using the EditArt params logic
-            seedRandomness();
-            generateRandomConfig();
-            
-            rectManager = new RectangleManager(width, height, CONFIG.simulation.splitDepth, 0, CONFIG.simulation.numZones);
-            rectManager.initializeRectangles();
-            assignRandomEffects();
-
-            prevFbo.begin();
-            clear();
-            shader(shdInit);
-            shdInit.setUniform('u_gridSize', [width, height]);
-            shdInit.setUniform('u_paletteSeed', CONFIG.paletteSeed);
-            shdInit.setUniform('u_color0', CONFIG.palette[0]);
-            shdInit.setUniform('u_color1', CONFIG.palette[1]);
-            shdInit.setUniform('u_color2', CONFIG.palette[2]);
-            shdInit.setUniform('u_color3', CONFIG.palette[3]);
-            fullScreenQuad();
-            prevFbo.end();
-
-            nextFbo.begin();
-            clear();
-            shader(shdInit);
-            shdInit.setUniform('u_gridSize', [width, height]);
-            shdInit.setUniform('u_paletteSeed', CONFIG.paletteSeed);
-            shdInit.setUniform('u_color0', CONFIG.palette[0]);
-            shdInit.setUniform('u_color1', CONFIG.palette[1]);
-            shdInit.setUniform('u_color2', CONFIG.palette[2]);
-            shdInit.setUniform('u_color3', CONFIG.palette[3]);
-            fullScreenQuad();
-            nextFbo.end();
-            
-            myFrameCount = 0;
-            previewTriggered = false;
-        }
-
-        function fullScreenQuad() {
-            beginShape(TRIANGLES);
-            vertex(-1, -1, 0, 0, 0); vertex(1, -1, 0, 1, 0); vertex(-1, 1, 0, 0, 1);
-            vertex(1, -1, 0, 1, 0);  vertex(1, 1, 0, 1, 1);  vertex(-1, 1, 0, 0, 1);
-            endShape();
-        }
-
-        function draw() {
-            if (resetAnimation) {
-                initArtwork();
-                resetAnimation = false;
-            }
-            myFrameCount++;
-
-            if (!shdPush) return; 
-
-            if (!previewTriggered && myFrameCount > 180 && typeof triggerPreview === 'function') {
-                triggerPreview();
-                previewTriggered = true;
-            }
-
-            const currentTime = myFrameCount;
-
-            layer1Effects.forEach((effect) => {
-                if (currentTime - effect.lastResetTime > effect.nextResetInterval) {
-                    effect.id = CONFIG.activeEffects[Math.floor(eaRandom() * 7)];
-                    effect.inverted = eaRandom() < 0.5;
-                    effect.lastResetTime = currentTime;
-                    effect.nextResetInterval = CONFIG.simulation.effectChangeMin + eaRandom() * (CONFIG.simulation.effectChangeMax - CONFIG.simulation.effectChangeMin);
-                }
+          while (this.rectangles.length < this.maxRectangleCount) {
+            this.rectangles.push({
+              x: 0,
+              y: 0,
+              width: 0,
+              height: 0,
+              vx: 0,
+              vy: 0,
+              targetVx: 0,
+              targetVy: 0,
             });
-
-            rectManager.update();
-            
-            shiftFbo.begin();
-            clear();
-            shader(shdShift);
-            shdShift.setUniform('u_frameCount', myFrameCount);
-            shdShift.setUniform('u_gridSize', [width, height]);
-            shdShift.setUniform('u_seed', CONFIG.shaderSeed);
-            shdShift.setUniform('u_turbulence', CONFIG.effects.turbulenceMag);
-            shdShift.setUniform('u_previousPrimaryColor', prevFbo);
-            for (let i = 0; i < CONFIG.simulation.numZones; i++) {
-                let r = rectManager.rectangles[i];
-                if (r) shdShift.setUniform(`u_rect${i}`, [r.x, r.y, r.width, r.height]);
-                let eff = layer1Effects[i];
-                if (eff) {
-                    shdShift.setUniform(`u_effect${i}`, eff.id);
-                    shdShift.setUniform(`u_inverted${i}`, eff.inverted);
-                }
-            }
-            fullScreenQuad();
-            shiftFbo.end();
-
-            nextFbo.begin();
-            clear();
-            shader(shdPush);
-            shdPush.setUniform('u_frameCount', myFrameCount);
-            shdPush.setUniform('u_gridSize', [width, height]);
-            shdPush.setUniform('u_seed', CONFIG.shaderSeed);
-            shdPush.setUniform('u_shiftMap', shiftFbo);
-            shdPush.setUniform('u_previousPrimaryColor', prevFbo);
-            for (let i = 0; i < CONFIG.simulation.numZones; i++) {
-                let r = rectManager.rectangles[i];
-                if (r) shdPush.setUniform(`u_rect${i}`, [r.x, r.y, r.width, r.height]);
-                let eff = layer1Effects[i];
-                if (eff) {
-                    shdPush.setUniform(`u_effect${i}`, eff.id);
-                    shdPush.setUniform(`u_inverted${i}`, eff.inverted);
-                }
-            }
-            fullScreenQuad();
-            nextFbo.end();
-
-            let temp = prevFbo;
-            prevFbo = nextFbo;
-            nextFbo = temp;
-
-            clear();
-            shader(shdPost);
-            shdPost.setUniform('u_primaryColorIn', nextFbo);
-            shdPost.setUniform('u_gridSize', [width, height]);
-            shdPost.setUniform('u_sharpenIntensity', CONFIG.effects.sharpenIntensity);
-            fullScreenQuad();
+          }
         }
 
-        function windowResizedUser() {
-            resizeCanvas(windowWidth, windowHeight);
-            prevFbo.resize(width, height);
-            nextFbo.resize(width, height);
-            shiftFbo.resize(width, height);
-            
-            // Re-initialize artwork on resize to match EditArt behavior
-            initArtwork();
+        splitSpace(container, depth) {
+          if (
+            depth >= this.splitDepth ||
+            this.rectangles.length >= this.maxRectangleCount
+          ) {
+            const vx = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax;
+            const vy = (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax;
+            this.rectangles.push({
+              ...container,
+              vx,
+              vy,
+              targetVx: vx,
+              targetVy: vy,
+            });
+            return;
+          }
+          const horiz = eaRandom() > 0.5;
+          if (horiz) {
+            if (container.height < this.spacing + 2) {
+              this.rectangles.push({
+                ...container,
+                vx: 0,
+                vy: 0,
+                targetVx: 0,
+                targetVy: 0,
+              });
+              return;
+            }
+            const sp =
+              Math.floor(eaRandom() * (container.height - this.spacing - 1)) +
+              1;
+            this.splitSpace(
+              {
+                x: container.x,
+                y: container.y,
+                width: container.width,
+                height: sp,
+              },
+              depth + 1,
+            );
+            this.splitSpace(
+              {
+                x: container.x,
+                y: container.y + sp + this.spacing,
+                width: container.width,
+                height: container.height - sp - this.spacing,
+              },
+              depth + 1,
+            );
+          } else {
+            if (container.width < this.spacing + 2) {
+              this.rectangles.push({
+                ...container,
+                vx: 0,
+                vy: 0,
+                targetVx: 0,
+                targetVy: 0,
+              });
+              return;
+            }
+            const sp =
+              Math.floor(eaRandom() * (container.width - this.spacing - 1)) + 1;
+            this.splitSpace(
+              {
+                x: container.x,
+                y: container.y,
+                width: sp,
+                height: container.height,
+              },
+              depth + 1,
+            );
+            this.splitSpace(
+              {
+                x: container.x + sp + this.spacing,
+                y: container.y,
+                width: container.width - sp - this.spacing,
+                height: container.height,
+              },
+              depth + 1,
+            );
+          }
         }
 
-        function assignRandomEffects() {
-            layer1Effects = [];
-            const now = myFrameCount || 0;
-            for (let i = 0; i < CONFIG.simulation.numZones; i++) {
-                layer1Effects.push({
-                    id: CONFIG.activeEffects[Math.floor(eaRandom() * 7)],
-                    inverted: eaRandom() < 0.5,
-                    lastResetTime: now,
-                    nextResetInterval: CONFIG.simulation.effectChangeMin + eaRandom() * (CONFIG.simulation.effectChangeMax - CONFIG.simulation.effectChangeMin)
-                });
+        update() {
+          this.rectangles.forEach((rect) => {
+            if (rect.width === 0) return;
+
+            if (eaRandom() < CONFIG.movement.stutterChance) {
+              rect.x += (eaRandom() - 0.5) * CONFIG.movement.stutterMagnitude;
+              rect.y += (eaRandom() - 0.5) * CONFIG.movement.stutterMagnitude;
+              rect.targetVx =
+                (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax * 2.0;
+              rect.targetVy =
+                (eaRandom() - 0.5) * CONFIG.movement.zoneSpeedMax * 2.0;
             }
+
+            rect.vx += (rect.targetVx - rect.vx) * CONFIG.movement.easing;
+            rect.vy += (rect.targetVy - rect.vy) * CONFIG.movement.easing;
+            rect.x += rect.vx;
+            rect.y += rect.vy;
+
+            if (rect.x <= 0 || rect.x + rect.width >= this.gridCols) {
+              rect.vx *= -1;
+              rect.targetVx *= -1;
+            }
+            if (rect.y <= 0 || rect.y + rect.height >= this.gridRows) {
+              rect.vy *= -1;
+              rect.targetVy *= -1;
+            }
+
+            rect.x = Math.max(0, Math.min(rect.x, this.gridCols - rect.width));
+            rect.y = Math.max(0, Math.min(rect.y, this.gridRows - rect.height));
+          });
         }
+      }
+
+      // ==========================================================
+      // 7. MAIN P5.JS LIFECYCLE
+      // ==========================================================
+      let shdInit, shdShift, shdPush, shdPost;
+      let prevFbo, nextFbo, shiftFbo;
+      let rectManager;
+      let layer1Effects = [];
+      let previewTriggered = false;
+      let myFrameCount = 0;
+
+      function setup() {
+        setAttributes("antialias", false);
+        createCanvas(windowWidth, windowHeight, WEBGL);
+        pixelDensity(1);
+        noCursor();
+
+        try {
+          shdInit = createShader(vertShader, InitialPixelShader);
+          shdShift = createShader(vertShader, PixelDisplacementShader);
+          shdPush = createShader(vertShader, PixelUpdateShader);
+          shdPost = createShader(vertShader, PostProcessShader);
+        } catch (e) {
+          console.error("Shader failed to compile: " + e.message);
+          return;
+        }
+
+        prevFbo = createFramebuffer();
+        nextFbo = createFramebuffer();
+        shiftFbo = createFramebuffer();
+
+        initArtwork();
+      }
+
+      function initArtwork() {
+        // Seed randomness using the EditArt params logic
+        seedRandomness();
+
+        // Generate a single integer seed from EditArt's randomFull()
+        // This seed can be copied to the Master version to recreate the exact artwork
+        initialSeed = Math.floor(randomFull() * 999999999);
+        masterSeed = initialSeed;
+
+        generateRandomConfig();
+
+        rectManager = new RectangleManager(
+          width,
+          height,
+          CONFIG.simulation.splitDepth,
+          0,
+          CONFIG.simulation.numZones,
+        );
+        rectManager.initializeRectangles();
+        assignRandomEffects();
+
+        prevFbo.begin();
+        clear();
+        shader(shdInit);
+        shdInit.setUniform("u_gridSize", [width, height]);
+        shdInit.setUniform("u_paletteSeed", CONFIG.paletteSeed);
+        shdInit.setUniform("u_color0", CONFIG.palette[0]);
+        shdInit.setUniform("u_color1", CONFIG.palette[1]);
+        shdInit.setUniform("u_color2", CONFIG.palette[2]);
+        shdInit.setUniform("u_color3", CONFIG.palette[3]);
+        fullScreenQuad();
+        prevFbo.end();
+
+        nextFbo.begin();
+        clear();
+        shader(shdInit);
+        shdInit.setUniform("u_gridSize", [width, height]);
+        shdInit.setUniform("u_paletteSeed", CONFIG.paletteSeed);
+        shdInit.setUniform("u_color0", CONFIG.palette[0]);
+        shdInit.setUniform("u_color1", CONFIG.palette[1]);
+        shdInit.setUniform("u_color2", CONFIG.palette[2]);
+        shdInit.setUniform("u_color3", CONFIG.palette[3]);
+        fullScreenQuad();
+        nextFbo.end();
+
+        myFrameCount = 0;
+        previewTriggered = false;
+      }
+
+      function fullScreenQuad() {
+        beginShape(TRIANGLES);
+        vertex(-1, -1, 0, 0, 0);
+        vertex(1, -1, 0, 1, 0);
+        vertex(-1, 1, 0, 0, 1);
+        vertex(1, -1, 0, 1, 0);
+        vertex(1, 1, 0, 1, 1);
+        vertex(-1, 1, 0, 0, 1);
+        endShape();
+      }
+
+      function draw() {
+        if (resetAnimation) {
+          initArtwork();
+          resetAnimation = false;
+        }
+        myFrameCount++;
+
+        if (!shdPush) return;
+
+        if (
+          !previewTriggered &&
+          myFrameCount > 180 &&
+          typeof triggerPreview === "function"
+        ) {
+          triggerPreview();
+          previewTriggered = true;
+        }
+
+        const currentTime = myFrameCount;
+
+        layer1Effects.forEach((effect) => {
+          if (currentTime - effect.lastResetTime > effect.nextResetInterval) {
+            effect.id = CONFIG.activeEffects[Math.floor(eaRandom() * 7)];
+            effect.inverted = eaRandom() < 0.5;
+            effect.lastResetTime = currentTime;
+            effect.nextResetInterval =
+              CONFIG.simulation.effectChangeMin +
+              eaRandom() *
+                (CONFIG.simulation.effectChangeMax -
+                  CONFIG.simulation.effectChangeMin);
+          }
+        });
+
+        rectManager.update();
+
+        shiftFbo.begin();
+        clear();
+        shader(shdShift);
+        shdShift.setUniform("u_frameCount", myFrameCount);
+        shdShift.setUniform("u_gridSize", [width, height]);
+        shdShift.setUniform("u_seed", CONFIG.shaderSeed);
+        shdShift.setUniform("u_turbulence", CONFIG.effects.turbulenceMag);
+        shdShift.setUniform("u_previousPrimaryColor", prevFbo);
+        for (let i = 0; i < CONFIG.simulation.numZones; i++) {
+          let r = rectManager.rectangles[i];
+          if (r)
+            shdShift.setUniform(`u_rect${i}`, [r.x, r.y, r.width, r.height]);
+          let eff = layer1Effects[i];
+          if (eff) {
+            shdShift.setUniform(`u_effect${i}`, eff.id);
+            shdShift.setUniform(`u_inverted${i}`, eff.inverted);
+          }
+        }
+        fullScreenQuad();
+        shiftFbo.end();
+
+        nextFbo.begin();
+        clear();
+        shader(shdPush);
+        shdPush.setUniform("u_frameCount", myFrameCount);
+        shdPush.setUniform("u_gridSize", [width, height]);
+        shdPush.setUniform("u_seed", CONFIG.shaderSeed);
+        shdPush.setUniform("u_shiftMap", shiftFbo);
+        shdPush.setUniform("u_previousPrimaryColor", prevFbo);
+        for (let i = 0; i < CONFIG.simulation.numZones; i++) {
+          let r = rectManager.rectangles[i];
+          if (r)
+            shdPush.setUniform(`u_rect${i}`, [r.x, r.y, r.width, r.height]);
+          let eff = layer1Effects[i];
+          if (eff) {
+            shdPush.setUniform(`u_effect${i}`, eff.id);
+            shdPush.setUniform(`u_inverted${i}`, eff.inverted);
+          }
+        }
+        fullScreenQuad();
+        nextFbo.end();
+
+        let temp = prevFbo;
+        prevFbo = nextFbo;
+        nextFbo = temp;
+
+        clear();
+        shader(shdPost);
+        shdPost.setUniform("u_primaryColorIn", nextFbo);
+        shdPost.setUniform("u_gridSize", [width, height]);
+        shdPost.setUniform(
+          "u_sharpenIntensity",
+          CONFIG.effects.sharpenIntensity,
+        );
+        fullScreenQuad();
+      }
+
+      function windowResizedUser() {
+        resizeCanvas(windowWidth, windowHeight);
+        prevFbo.resize(width, height);
+        nextFbo.resize(width, height);
+        shiftFbo.resize(width, height);
+
+        // Re-initialize artwork on resize to match EditArt behavior
+        initArtwork();
+      }
+
+      function assignRandomEffects() {
+        layer1Effects = [];
+        const now = myFrameCount || 0;
+        for (let i = 0; i < CONFIG.simulation.numZones; i++) {
+          layer1Effects.push({
+            id: CONFIG.activeEffects[Math.floor(eaRandom() * 7)],
+            inverted: eaRandom() < 0.5,
+            lastResetTime: now,
+            nextResetInterval:
+              CONFIG.simulation.effectChangeMin +
+              eaRandom() *
+                (CONFIG.simulation.effectChangeMax -
+                  CONFIG.simulation.effectChangeMin),
+          });
+        }
+      }
     </script>
-</body>
+  </body>
 </html>
